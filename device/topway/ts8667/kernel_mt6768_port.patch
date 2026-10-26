@@ -1,0 +1,2512 @@
+diff --git a/Makefile b/Makefile
+index a9b2ff9a0..4b2cbd0f5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -453,6 +453,7 @@ KBUILD_AFLAGS_MODULE  := -DMODULE
+ KBUILD_CFLAGS_MODULE  := -DMODULE
+ KBUILD_LDFLAGS_MODULE := -T $(srctree)/scripts/module-common.lds
+ LDFLAGS :=
++KBUILD_CFLAGS += -Wno-error
+ GCC_PLUGINS_CFLAGS :=
+ CLANG_FLAGS :=
+ TARGET_BUILD_VARIANT := user
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index ab3eb8df3..1921bb85a 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -119,7 +119,7 @@ LD		+= -EB
+ ifeq ($(ld-name),gold)
+ LDFLAGS		+= -maarch64_elf64_be_vec
+ else
+-LDFLAGS		+= -maarch64elfb
++LDFLAGS		+= -maarch64linuxb
+ endif
+ UTS_MACHINE	:= aarch64_be
+ else
+@@ -130,7 +130,7 @@ LD		+= -EL
+ ifeq ($(ld-name),gold)
+ LDFLAGS		+= -maarch64_elf64_le_vec
+ else
+-LDFLAGS		+= -maarch64elf
++LDFLAGS		+= -maarch64linux
+ endif
+ UTS_MACHINE	:= aarch64
+ endif
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 9f937b8bc..cfa3df1dc 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -1,7 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ ccflags-y += -Wno-error=implicit-function-declaration
+ ccflags-y += -Wno-error=strict-prototypes
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
+ obj-$(CONFIG_TIMER_OF)		+= timer-of.o
+ obj-$(CONFIG_TIMER_PROBE)	+= timer-probe.o
+ obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
+index 01dffdb99..8e7bae06b 100644
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/drivers/devfreq/
+ # SPDX-License-Identifier: GPL-2.0
+ obj-$(CONFIG_PM_DEVFREQ)	+= devfreq.o
+ obj-$(CONFIG_PM_DEVFREQ_EVENT)	+= devfreq-event.o
+diff --git a/drivers/devfreq/helio-dvfsrc-v3/Makefile b/drivers/devfreq/helio-dvfsrc-v3/Makefile
+index 1712fb68f..be3fc43cd 100644
+--- a/drivers/devfreq/helio-dvfsrc-v3/Makefile
++++ b/drivers/devfreq/helio-dvfsrc-v3/Makefile
+@@ -10,7 +10,7 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+-ccflags-y += -Werror -I$(srctree)/drivers/devfreq
++ccflags-y +=  -I$(srctree)/drivers/devfreq
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/spm/$(MTK_PLATFORM)/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
+diff --git a/drivers/devfreq/helio-dvfsrc-v4/Makefile b/drivers/devfreq/helio-dvfsrc-v4/Makefile
+index e299257f7..2b6ac5f2e 100644
+--- a/drivers/devfreq/helio-dvfsrc-v4/Makefile
++++ b/drivers/devfreq/helio-dvfsrc-v4/Makefile
+@@ -10,7 +10,7 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+-ccflags-y += -Werror -I$(srctree)/drivers/devfreq
++ccflags-y +=  -I$(srctree)/drivers/devfreq
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/
+diff --git a/drivers/gpu/drm/i915/Makefile b/drivers/gpu/drm/i915/Makefile
+index 2e034efc4..7123a68e0 100644
+--- a/drivers/gpu/drm/i915/Makefile
++++ b/drivers/gpu/drm/i915/Makefile
+@@ -3,7 +3,7 @@
+ # Makefile for the drm device driver.  This driver provides support for the
+ # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+ 
+-subdir-ccflags-$(CONFIG_DRM_I915_WERROR) := -Werror
++subdir-ccflags-$(CONFIG_DRM_I915_WERROR) := 
+ subdir-ccflags-y += \
+ 	$(call as-instr,movntdqa (%eax)$(comma)%xmm0,-DCONFIG_AS_MOVNTDQA)
+ 
+diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+index cfef17209..343869ed6 100644
+--- a/drivers/gpu/drm/mediatek/Makefile
++++ b/drivers/gpu/drm/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ 
+ mediatek-drm-y := mtk_drm_drv.o \
+ 		  mtk_disp_color.o \
+diff --git a/drivers/gpu/drm/tilcdc/Makefile b/drivers/gpu/drm/tilcdc/Makefile
+index b9e1108e5..4c5f8b750 100644
+--- a/drivers/gpu/drm/tilcdc/Makefile
++++ b/drivers/gpu/drm/tilcdc/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ ifeq (, $(findstring -W,$(EXTRA_CFLAGS)))
+-	ccflags-y += -Werror
++	ccflags-y += 
+ endif
+ 
+ obj-$(CONFIG_DRM_TILCDC_SLAVE_COMPAT) += tilcdc_slave_compat.o \
+diff --git a/drivers/input/keyboard/mediatek/Makefile b/drivers/input/keyboard/mediatek/Makefile
+index 92242bbf7..2c4fd2fbf 100644
+--- a/drivers/input/keyboard/mediatek/Makefile
++++ b/drivers/input/keyboard/mediatek/Makefile
+@@ -16,7 +16,7 @@ MTK_KPD_PLATFORM:=mt6765
+ else
+ MTK_KPD_PLATFORM:=$(CONFIG_MTK_PLATFORM)
+ endif
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_KPD_PLATFORM)/include/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_KPD_PLATFORM)/include/
+ subdir-ccflags-y += -I$(srctree)/drivers/input/keyboard/mediatek/$(MTK_KPD_PLATFORM)/
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/
+ obj-$(CONFIG_KEYBOARD_MTK) := kpd.o
+diff --git a/drivers/input/keyboard/mediatek/mt6765/Makefile b/drivers/input/keyboard/mediatek/mt6765/Makefile
+index 03f35ef8c..ec9fa666b 100644
+--- a/drivers/input/keyboard/mediatek/mt6765/Makefile
++++ b/drivers/input/keyboard/mediatek/mt6765/Makefile
+@@ -1,3 +1,3 @@
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/input/keyboard/mediatek/
++subdir-ccflags-y +=  -I$(srctree)/drivers/input/keyboard/mediatek/
+ 
+ obj-$(CONFIG_KEYBOARD_MTK) := hal_kpd.o
+diff --git a/drivers/input/keyboard/mediatek/mt6768/Makefile b/drivers/input/keyboard/mediatek/mt6768/Makefile
+index baced291b..b73bfb2d2 100644
+--- a/drivers/input/keyboard/mediatek/mt6768/Makefile
++++ b/drivers/input/keyboard/mediatek/mt6768/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/input/keyboard/mediatek/
++subdir-ccflags-y +=  -I$(srctree)/drivers/input/keyboard/mediatek/
+ 
+ ifeq ($(CONFIG_MT_SND_SOC_NEW_ARCH),y)
+ 	EXTRA_CFLAGS += -I$(srctree)/sound/soc/mediatek/common/
+diff --git a/drivers/input/touchscreen/mediatek/Makefile b/drivers/input/touchscreen/mediatek/Makefile
+index 107956f42..b580333dc 100644
+--- a/drivers/input/touchscreen/mediatek/Makefile
++++ b/drivers/input/touchscreen/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-#subdir-ccflags-y += -Werror
++#subdir-ccflags-y += 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ ccflags-y += -I$(srctree)/drivers/input/touchscreen/mediatek
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+diff --git a/drivers/input/touchscreen/mediatek/gslX680/Makefile b/drivers/input/touchscreen/mediatek/gslX680/Makefile
+index e4b6aad15..9ab4ebf5f 100644
+--- a/drivers/input/touchscreen/mediatek/gslX680/Makefile
++++ b/drivers/input/touchscreen/mediatek/gslX680/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ ccflags-y += -I$(srctree)/drivers/input/touchscreen/mediatek
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+diff --git a/drivers/media/platform/mtk-vcodec/Makefile b/drivers/media/platform/mtk-vcodec/Makefile
+index d0df747d5..707d7d007 100644
+--- a/drivers/media/platform/mtk-vcodec/Makefile
++++ b/drivers/media/platform/mtk-vcodec/Makefile
+@@ -42,7 +42,7 @@ endif
+ mtk-vcodec-common-y := $(MTK_PLATFORM)/mtk_vcodec_intr.o \
+ 		mtk_vcodec_util.o\
+ 
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ ifdef CONFIG_VIDEO_MEDIATEK_VCU
+ 	ccflags-y += -I$(srctree)/drivers/media/platform/mtk-vcu
+ endif
+diff --git a/drivers/media/platform/mtk-vcu/Makefile b/drivers/media/platform/mtk-vcu/Makefile
+index 28264366a..c7f2f2f3a 100644
+--- a/drivers/media/platform/mtk-vcu/Makefile
++++ b/drivers/media/platform/mtk-vcu/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq
+ 
+diff --git a/drivers/media/platform/mtk-videobuf/Makefile b/drivers/media/platform/mtk-videobuf/Makefile
+index 1172aef48..15d6ffa6e 100644
+--- a/drivers/media/platform/mtk-videobuf/Makefile
++++ b/drivers/media/platform/mtk-videobuf/Makefile
+@@ -1,2 +1,2 @@
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ obj-y += mtk-dma-contig.o
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 117d4f001..f98905b68 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -2,7 +2,7 @@
+ #
+ # Makefile for multifunction miscellaneous devices
+ #
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+ 
+ 88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
+ obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
+diff --git a/drivers/misc/cxl/Makefile b/drivers/misc/cxl/Makefile
+index 502d41fc9..a8333e77a 100644
+--- a/drivers/misc/cxl/Makefile
++++ b/drivers/misc/cxl/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ ccflags-y			:= $(call cc-disable-warning, unused-const-variable)
+-ccflags-$(CONFIG_PPC_WERROR)	+= -Werror
++ccflags-$(CONFIG_PPC_WERROR)	+= 
+ 
+ cxl-y				+= main.o file.o irq.o fault.o native.o
+ cxl-y				+= context.o sysfs.o pci.o trace.o
+diff --git a/drivers/misc/mediatek/Makefile b/drivers/misc/mediatek/Makefile
+index 5b7e2dc81..443063185 100644
+--- a/drivers/misc/mediatek/Makefile
++++ b/drivers/misc/mediatek/Makefile
+@@ -13,7 +13,7 @@
+ 
+ #$(call all-subdir-src-or-makefile)
+ export MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ 
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/
+diff --git a/drivers/misc/mediatek/accdet/Makefile b/drivers/misc/mediatek/accdet/Makefile
+index 15fb3fdf2..45f7bed45 100644
+--- a/drivers/misc/mediatek/accdet/Makefile
++++ b/drivers/misc/mediatek/accdet/Makefile
+@@ -1,7 +1,7 @@
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-$(CONFIG_MACH_MT8167)+= -Werror -I$(srctree)/drivers/misc/mediatek/accdet/$(MTK_PLATFORM)
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-$(CONFIG_MACH_MT8167)+=  -I$(srctree)/drivers/misc/mediatek/accdet/$(MTK_PLATFORM)
+ 
+-#subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/$(MTK_PLATFORM)
++#subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/accdet/$(MTK_PLATFORM)
+ subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6391)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6391
+ subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6355)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6355
+ subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6357)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6357
+diff --git a/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile b/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile
+index 0ad7e2727..380873cab 100644
+--- a/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile
++++ b/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile
+@@ -13,9 +13,9 @@
+ 
+ ccflags-y += \
+ 	-I$(PPM_ROOT_DIR)/inc \
+-	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include	\
++	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(subst ",,$(CONFIG_MTK_PLATFORM))/include	\
+ 	-I$(srctree)/drivers/misc/mediatek/base/power/include	\
+-	-I$(srctree)/drivers/misc/mediatek/base/power/$(CONFIG_MTK_PLATFORM)	\
++	-I$(srctree)/drivers/misc/mediatek/base/power/$(subst ",,$(CONFIG_MTK_PLATFORM))	\
+ 
+ ifneq (,$(findstring 3gear,$(PROJECT_DTB_NAMES)))
+ ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/mt6893
+@@ -23,14 +23,14 @@ else
+ ifeq ($(CONFIG_MACH_MT6893),y)
+ ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/mt6893
+ else
+-ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/$(CONFIG_MTK_PLATFORM)
++ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/$(subst ",,$(CONFIG_MTK_PLATFORM))
+ endif
+ endif
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += \
+ 	-I$(srctree)/drivers/misc/mediatek/sspm/	\
+-	-I$(srctree)/drivers/misc/mediatek/sspm/$(CONFIG_MTK_PLATFORM)
++	-I$(srctree)/drivers/misc/mediatek/sspm/$(subst ",,$(CONFIG_MTK_PLATFORM))
+ endif
+ 
+ # only build-in dummy driver for MT6833
+diff --git a/drivers/misc/mediatek/base/power/ppm_v3/src/mach/mt6768/Makefile b/drivers/misc/mediatek/base/power/ppm_v3/src/mach/mt6768/Makefile
+index 4784f2faa..50bcd28fc 100644
+--- a/drivers/misc/mediatek/base/power/ppm_v3/src/mach/mt6768/Makefile
++++ b/drivers/misc/mediatek/base/power/ppm_v3/src/mach/mt6768/Makefile
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/mt6768
+ #
+ # Copyright (C) 2018 MediaTek Inc.
+ #
+diff --git a/drivers/misc/mediatek/base/power/spm/common/mtk_idle_fs/Makefile b/drivers/misc/mediatek/base/power/spm/common/mtk_idle_fs/Makefile
+index ca001f7bc..c22ca00ca 100644
+--- a/drivers/misc/mediatek/base/power/spm/common/mtk_idle_fs/Makefile
++++ b/drivers/misc/mediatek/base/power/spm/common/mtk_idle_fs/Makefile
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/spm/common/mtk_idle_fs/
+ obj-y += mtk_lp_kernfs.o
+ obj-y += mtk_lp_sysfs.o
+ obj-y += mtk_idle_sysfs.o
+diff --git a/drivers/misc/mediatek/base/power/spm/common/mtk_idle_module.c b/drivers/misc/mediatek/base/power/spm/common/mtk_idle_module.c
+index 432853a8e..754179841 100644
+--- a/drivers/misc/mediatek/base/power/spm/common/mtk_idle_module.c
++++ b/drivers/misc/mediatek/base/power/spm/common/mtk_idle_module.c
+@@ -20,7 +20,7 @@
+ #if defined(CONFIG_THERMAL)
+ #include <mtk_thermal.h> /* mtkTTimer_start/cancel_timer */
+ #endif
+-#include <mtk_idle_profile.h>
++#include "mtk_idle_profile.h"
+ #include <linux/atomic.h>
+ 
+ DEFINE_MUTEX(mtk_idle_module_locker);
+diff --git a/drivers/misc/mediatek/base/power/spm/mt6768/Makefile b/drivers/misc/mediatek/base/power/spm/mt6768/Makefile
+index dd3023ac2..a814a9dfe 100644
+--- a/drivers/misc/mediatek/base/power/spm/mt6768/Makefile
++++ b/drivers/misc/mediatek/base/power/spm/mt6768/Makefile
+@@ -1,3 +1,5 @@
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/spm/$(MTK_PLATFORM)/
+ # Include mtk_idle_internal.h for MTK_IDLE_OPT_XXX
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/spm/common/
+ # Include mt-plat/upmu_common.h
+diff --git a/drivers/misc/mediatek/base/power/swpm_v1/Makefile b/drivers/misc/mediatek/base/power/swpm_v1/Makefile
+index 7653b4b76..f539578ea 100644
+--- a/drivers/misc/mediatek/base/power/swpm_v1/Makefile
++++ b/drivers/misc/mediatek/base/power/swpm_v1/Makefile
+@@ -11,11 +11,12 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ ccflags-y += \
+ 	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/	\
+ 	-I$(srctree)/drivers/misc/mediatek/base/power/include/	\
+ 	-I$(srctree)/drivers/misc/mediatek/base/power/include/swpm_v1/			\
+-	-I$(srctree)/drivers/misc/mediatek/dramc/$(CONFIG_MTK_PLATFORM)/		\
++	-I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/		\
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+@@ -39,8 +40,8 @@ ccflags-y += \
+ 	obj-y += $(subst ",,mt6893)/
+ else
+ ccflags-y += \
+-	-I$(srctree)/drivers/misc/mediatek/base/power/swpm_v1/$(CONFIG_MTK_PLATFORM)/
+-	obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
++	-I$(srctree)/drivers/misc/mediatek/base/power/swpm_v1/$(MTK_PLATFORM)/
++	obj-y += $(MTK_PLATFORM)/
+ endif
+ 
+ ifneq ($(CONFIG_FPGA_EARLY_PORTING),y)
+diff --git a/drivers/misc/mediatek/base/power/swpm_v1/mt6768/Makefile b/drivers/misc/mediatek/base/power/swpm_v1/mt6768/Makefile
+index 102103156..16a20ab2f 100644
+--- a/drivers/misc/mediatek/base/power/swpm_v1/mt6768/Makefile
++++ b/drivers/misc/mediatek/base/power/swpm_v1/mt6768/Makefile
+@@ -11,19 +11,21 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ ccflags-y += \
++	-I$(srctree)/drivers/misc/mediatek/base/power/swpm_v1/$(MTK_PLATFORM)/ \
+ 	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/	\
+-	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include	\
++	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include	\
+ 	-I$(srctree)/drivers/misc/mediatek/base/power/include/	\
+ 	-I$(srctree)/drivers/misc/mediatek/base/power/include/swpm_v1/	\
+-	-I$(srctree)/drivers/misc/mediatek/thermal/$(CONFIG_MTK_PLATFORM)/inc/mach/	\
+-	-I$(srctree)/drivers/misc/mediatek/base/power/$(CONFIG_MTK_PLATFORM)/	\
++	-I$(srctree)/drivers/misc/mediatek/thermal/$(MTK_PLATFORM)/inc/mach/	\
++	-I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)/	\
+ 	-I$(srctree)/drivers/devfreq/	\
+-	-I$(srctree)/drivers/misc/mediatek/dramc/$(CONFIG_MTK_PLATFORM)/	\
++	-I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/	\
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/$(CONFIG_MTK_PLATFORM)
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/$(MTK_PLATFORM)
+ endif
+ 
+ obj-y += mtk_swpm_platform.o
+diff --git a/drivers/misc/mediatek/ccu/src/mt6768/Makefile b/drivers/misc/mediatek/ccu/src/mt6768/Makefile
+index 9354a1a87..846079960 100644
+--- a/drivers/misc/mediatek/ccu/src/mt6768/Makefile
++++ b/drivers/misc/mediatek/ccu/src/mt6768/Makefile
+@@ -11,6 +11,8 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/ccu/src/$(MTK_PLATFORM)
+ #ion
+ ccflags-y += -I$(srctree)/drivers/staging/android/ion \
+              -I$(srctree)/drivers/staging/android/ion/mtk \
+diff --git a/drivers/misc/mediatek/chip/Makefile b/drivers/misc/mediatek/chip/Makefile
+index 6466805c6..66e3845ad 100644
+--- a/drivers/misc/mediatek/chip/Makefile
++++ b/drivers/misc/mediatek/chip/Makefile
+@@ -11,7 +11,7 @@
+ # GNU General Public License for more details.
+ #
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/chip/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/chip/
+ 
+ obj-$(CONFIG_MTK_CHIP) += CHIP_COMMON.o
+ CHIP_COMMON-$(CONFIG_MTK_CHIP) := mtk_chip_common.o
+diff --git a/drivers/misc/mediatek/cmdq/v3/Makefile b/drivers/misc/mediatek/cmdq/v3/Makefile
+index 793d8ef2a..bea28d038 100644
+--- a/drivers/misc/mediatek/cmdq/v3/Makefile
++++ b/drivers/misc/mediatek/cmdq/v3/Makefile
+@@ -12,6 +12,7 @@
+ #
+ 
+ # common driver code for CMDQ
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ 
+ ccflags-$(CONFIG_MACH_MT6768) += -DCMDQ_MDP_ENABLE_SPR
+ 
+diff --git a/drivers/misc/mediatek/cmdq/v3/mt6768/Makefile b/drivers/misc/mediatek/cmdq/v3/mt6768/Makefile
+index 7e3eb5cdc..382ee5110 100644
+--- a/drivers/misc/mediatek/cmdq/v3/mt6768/Makefile
++++ b/drivers/misc/mediatek/cmdq/v3/mt6768/Makefile
+@@ -13,7 +13,8 @@
+ 
+ # drivers/cmdq
+ 
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3 \
++ccflags-y += -I$(src) \
++             -I$(srctree)/drivers/misc/mediatek/cmdq/v3 \
+              -I$(srctree)/drivers/misc/mediatek/cmdq/v3/inc/cmdq_sec_dr/ \
+              -I$(srctree)/drivers/misc/mediatek/smi/ \
+              -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM) \
+diff --git a/drivers/misc/mediatek/connectivity/Makefile b/drivers/misc/mediatek/connectivity/Makefile
+index ce210a21a..6238b6de6 100644
+--- a/drivers/misc/mediatek/connectivity/Makefile
++++ b/drivers/misc/mediatek/connectivity/Makefile
+@@ -19,13 +19,13 @@ ifneq ($(KERNELRELEASE),)
+     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/clkbuf_v1
+     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/clkbuf_v1/$(MTK_PLATFORM)
+-    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++    subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++    subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+ ifeq ($(CONFIG_MTK_PMIC_CHIP_MT6359),y)
+-    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include/mt6359
++    subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include/mt6359
+ endif
+ ifeq ($(CONFIG_MTK_PMIC_NEW_ARCH),y)
+-    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++    subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ endif
+     subdir-ccflags-y += -I$(srctree)/drivers/mmc/core
+     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
+diff --git a/drivers/misc/mediatek/connectivity/common/Makefile b/drivers/misc/mediatek/connectivity/common/Makefile
+index a37475568..6d9e5d4d2 100644
+--- a/drivers/misc/mediatek/connectivity/common/Makefile
++++ b/drivers/misc/mediatek/connectivity/common/Makefile
+@@ -83,7 +83,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+ ###############################################################################
+ 
+ 
+-ccflags-y += -Werror
++ccflags-y += 
+ 
+ ifneq ($(filter "MT6628",$(CONFIG_MTK_COMBO_CHIP)),)
+     ccflags-y += -D MT6628
+diff --git a/drivers/misc/mediatek/connectivity/conninfra/Makefile b/drivers/misc/mediatek/connectivity/conninfra/Makefile
+index af69abf57..ea8d1acfb 100755
+--- a/drivers/misc/mediatek/connectivity/conninfra/Makefile
++++ b/drivers/misc/mediatek/connectivity/conninfra/Makefile
+@@ -65,7 +65,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include/
+ ###############################################################################
+ 
+ 
+-ccflags-y += -Werror
++ccflags-y += 
+ ccflags-y += -Wno-error=format
+ ccflags-y += -Wno-error=format-extra-args
+ 
+diff --git a/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7663/Makefile b/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7663/Makefile
+index c25556ed4..704f754b4 100644
+--- a/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7663/Makefile
++++ b/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7663/Makefile
+@@ -46,7 +46,7 @@ ccflags-y += -DWLAN_INCLUDE_PROC
+ ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=1
+ ccflags-y += -DCFG_SUPPORT_TSF_USING_BOOTTIME=1
+ ccflags-y += -DARP_MONITER_ENABLE=1
+-ccflags-y += -Werror
++ccflags-y += 
+ #ccflags-y:=$(filter-out -U$(WLAN_CHIP_ID),$(ccflags-y))
+ #ccflags-y += -DLINUX -D$(WLAN_CHIP_ID)
+ ccflags-y += -DLINUX
+@@ -247,7 +247,7 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/thermal/common/inc
+ 
+ ifeq ($(MTK_CPU_SCHED),y)
+ ccflags-y += -DCFG_SUPPORT_MTK_CPU_SCHED=1
+-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/sched/mtk_cpu_affinity
++ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/sched/mtk_cpu_affinity
+ else
+ ccflags-y += -DCFG_SUPPORT_MTK_CPU_SCHED=0
+ endif
+diff --git a/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7668/Makefile b/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7668/Makefile
+index 45373a28f..0526549ab 100644
+--- a/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7668/Makefile
++++ b/drivers/misc/mediatek/connectivity/wlan/core/gen4-mt7668/Makefile
+@@ -30,7 +30,7 @@ ccflags-y += -DCFG_SUPPORT_DEBUG_FS=0
+ ccflags-y += -DWLAN_INCLUDE_PROC
+ ccflags-y += -DCFG_SUPPORT_AGPS_ASSIST=1
+ ccflags-y += -DCFG_SUPPORT_TSF_USING_BOOTTIME=1
+-ccflags-y += -Werror
++ccflags-y += 
+ ccflags-y:=$(filter-out -U$(WLAN_CHIP_ID),$(ccflags-y))
+ ccflags-y += -DLINUX -D$(WLAN_CHIP_ID)
+ 
+diff --git a/drivers/misc/mediatek/debug_latch/cache_parity/Makefile b/drivers/misc/mediatek/debug_latch/cache_parity/Makefile
+index 3c5aefd25..3f575f66b 100644
+--- a/drivers/misc/mediatek/debug_latch/cache_parity/Makefile
++++ b/drivers/misc/mediatek/debug_latch/cache_parity/Makefile
+@@ -1 +1,2 @@
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/debug_latch/cache_parity
+ obj-y += cache_parity.o
+diff --git a/drivers/misc/mediatek/debug_latch/cache_parity/cache_parity.c b/drivers/misc/mediatek/debug_latch/cache_parity/cache_parity.c
+index bd484e422..bcd440578 100644
+--- a/drivers/misc/mediatek/debug_latch/cache_parity/cache_parity.c
++++ b/drivers/misc/mediatek/debug_latch/cache_parity/cache_parity.c
+@@ -26,7 +26,7 @@
+ #include <linux/device.h>
+ #include <linux/sched/clock.h>
+ #include <mt-plat/aee.h>
+-#include <cache_parity.h>
++#include "cache_parity.h"
+ #include <asm/cputype.h>
+ #include <linux/irqchip/mtk-gic-extend.h>
+ 
+diff --git a/drivers/misc/mediatek/debug_latch/plat_dbg_info/Makefile b/drivers/misc/mediatek/debug_latch/plat_dbg_info/Makefile
+index 1c41ba337..3ee29d6b0 100644
+--- a/drivers/misc/mediatek/debug_latch/plat_dbg_info/Makefile
++++ b/drivers/misc/mediatek/debug_latch/plat_dbg_info/Makefile
+@@ -12,6 +12,7 @@
+ #
+ 
+ # Do not change the following order
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/debug_latch/plat_dbg_info
+ obj-y += plat_dbg_info.o
+ obj-y += plat_sram_flag.o
+ 
+diff --git a/drivers/misc/mediatek/debug_latch/plat_dbg_info/plat_dbg_info.c b/drivers/misc/mediatek/debug_latch/plat_dbg_info/plat_dbg_info.c
+index 9a104b13e..3e11faf2a 100644
+--- a/drivers/misc/mediatek/debug_latch/plat_dbg_info/plat_dbg_info.c
++++ b/drivers/misc/mediatek/debug_latch/plat_dbg_info/plat_dbg_info.c
+@@ -20,7 +20,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ 
+-#include <plat_dbg_info.h>
++#include "plat_dbg_info.h"
+ 
+ static void __iomem **plat_dbg_info_base;
+ static unsigned int *plat_dbg_info_size;
+diff --git a/drivers/misc/mediatek/eccci/Makefile b/drivers/misc/mediatek/eccci/Makefile
+index 0f9e9ff5e..4b6febc45 100644
+--- a/drivers/misc/mediatek/eccci/Makefile
++++ b/drivers/misc/mediatek/eccci/Makefile
+@@ -18,20 +18,23 @@ else
+ ifeq (y, $(filter y, $(CONFIG_MACH_MT6833)))
+ MTK_PLATFORM := mt6833
+ else
+-MTK_PLATFORM := $(CONFIG_MTK_PLATFORM)
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ endif
+ endif
+ 
+ ifeq ($(CONFIG_MTK_ECCCI_DRIVER), y)
+ 
+ obj-$(CONFIG_MTK_ECCCI_DRIVER) := ccci.o
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/inc/
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/ccmni/
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/conn_md/include/
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/scp/$(MTK_PLATFORM)
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/inc/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/ccmni/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/conn_md/include/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/scp/$(MTK_PLATFORM)
+ 
+ # common services
+ ccci-y := ccci_core.o ccci_bm.o ccci_modem.o modem_sys1.o
+diff --git a/drivers/misc/mediatek/eccci/mt6768/Makefile b/drivers/misc/mediatek/eccci/mt6768/Makefile
+index 6903c8c6f..ebac0b9d2 100644
+--- a/drivers/misc/mediatek/eccci/mt6768/Makefile
++++ b/drivers/misc/mediatek/eccci/mt6768/Makefile
+@@ -12,6 +12,7 @@
+ #
+ 
+ ifeq ($(CONFIG_MTK_ECCCI_DRIVER), y)
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ 
+ ccflags-y += -I$(srctree)/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
+diff --git a/drivers/misc/mediatek/emi/mt6768/Makefile b/drivers/misc/mediatek/emi/mt6768/Makefile
+index 44d9d2f4b..b6263f9c3 100644
+--- a/drivers/misc/mediatek/emi/mt6768/Makefile
++++ b/drivers/misc/mediatek/emi/mt6768/Makefile
+@@ -11,6 +11,8 @@
+ # GNU General Public License for more details.
+ #
+ 
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/mt6768
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc
+diff --git a/drivers/misc/mediatek/ext_disp/mt6768/Makefile b/drivers/misc/mediatek/ext_disp/mt6768/Makefile
+index 58a15b5d4..007e4a6ef 100644
+--- a/drivers/misc/mediatek/ext_disp/mt6768/Makefile
++++ b/drivers/misc/mediatek/ext_disp/mt6768/Makefile
+@@ -15,7 +15,9 @@
+ # Makefile for external display driver.
+ #
+ 
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/ \
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/ext_disp/$(MTK_PLATFORM)/ \
++             -I$(srctree)/drivers/misc/mediatek/include/ \
+              -I$(srctree)/drivers/misc/mediatek/ext_disp/  \
+              -I$(srctree)/drivers/misc/mediatek/ext_disp/include/  \
+              -I$(srctree)/drivers/misc/mediatek/ext_disp/common/test/ \
+diff --git a/drivers/misc/mediatek/freqhopping/Makefile b/drivers/misc/mediatek/freqhopping/Makefile
+index 268b24474..bddbff94d 100644
+--- a/drivers/misc/mediatek/freqhopping/Makefile
++++ b/drivers/misc/mediatek/freqhopping/Makefile
+@@ -11,7 +11,10 @@
+ # GNU General Public License for more details.
+ #
+ 
+-ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/$(MTK_PLATFORM)/
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/$(MTK_PLATFORM)/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach/
+ 
+ ifeq (y,$(filter y,$(CONFIG_MACH_MT6739) \
+diff --git a/drivers/misc/mediatek/freqhopping/mt6768/Makefile b/drivers/misc/mediatek/freqhopping/mt6768/Makefile
+index 652356ff0..1b1eb9c76 100644
+--- a/drivers/misc/mediatek/freqhopping/mt6768/Makefile
++++ b/drivers/misc/mediatek/freqhopping/mt6768/Makefile
+@@ -11,6 +11,7 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/
+ 
+diff --git a/drivers/misc/mediatek/geniezone/mtee-kree/Makefile b/drivers/misc/mediatek/geniezone/mtee-kree/Makefile
+index b09cc40ed..23833f3d9 100644
+--- a/drivers/misc/mediatek/geniezone/mtee-kree/Makefile
++++ b/drivers/misc/mediatek/geniezone/mtee-kree/Makefile
+@@ -2,10 +2,10 @@
+ # Makefile for mtee kree components
+ #
+ 
+-#subdir-ccflags-y += -Werror
++#subdir-ccflags-y += 
+ $(info ************  drivers/trusty/mtee-kree mk ************)
+ 
+-ccflags-y := -I$(srctree)/drivers/misc/mediatek/geniezone/public -Werror $(ccflags-y)
++ccflags-y := -I$(srctree)/drivers/misc/mediatek/geniezone/public  $(ccflags-y)
+ 
+ ifneq ($(CONFIG_MACH_MT6758), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/ppm_v3/src/mach/$(CONFIG_MTK_PLATFORM)
+diff --git a/drivers/misc/mediatek/imgsensor/src/mt6768/Makefile b/drivers/misc/mediatek/imgsensor/src/mt6768/Makefile
+index 9f108e53b..1463f9570 100644
+--- a/drivers/misc/mediatek/imgsensor/src/mt6768/Makefile
++++ b/drivers/misc/mediatek/imgsensor/src/mt6768/Makefile
+@@ -32,14 +32,12 @@ obj-y				+= ../common/$(COMMON_VERSION)/imgsensor_sensor_list.o
+ 
+ 
+ define FILTER_DRV
+-ifeq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/$(1)),)
+-ifeq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/$(1)),)
+-common_drv += ../common/$(COMMON_VERSION)/$(1)/
+-else
+-platform_drv += $(1)/
+-endif
+-else
++ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/camera_project/$(ARCH_MTK_PROJECT)/$(1)),)
+ project_drv += ./camera_project/$(ARCH_MTK_PROJECT)/$(1)/
++else ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/$(1)),)
++platform_drv += $(1)/
++else ifneq ($(wildcard $(IMGSENSOR_DRIVER_PATH)/common/$(COMMON_VERSION)/$(1)),)
++common_drv += ../common/$(COMMON_VERSION)/$(1)/
+ endif
+ endef
+ 
+diff --git a/drivers/misc/mediatek/imgsensor/src/mt6768/camera_hw/Makefile b/drivers/misc/mediatek/imgsensor/src/mt6768/camera_hw/Makefile
+index d6ca4bb18..1ece28001 100644
+--- a/drivers/misc/mediatek/imgsensor/src/mt6768/camera_hw/Makefile
++++ b/drivers/misc/mediatek/imgsensor/src/mt6768/camera_hw/Makefile
+@@ -14,6 +14,8 @@
+ #
+ # Makefile for misc devices that really don't fit anywhere else.
+ #
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6768/include
+ ccflags-y += -I$(MTK_CUSTOM_PATH)/imgsensor/inc \
+ 
+ obj-y		+= regulator/
+diff --git a/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile
+new file mode 100644
+index 000000000..d66da2203
+--- /dev/null
++++ b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile
+@@ -0,0 +1,3 @@
++# SPDX-License-Identifier: GPL-2.0
++obj-y += hx8394d_hd480_dsi_vdo.o
++ccflags-$(CONFIG_MTK_LCM) += -I$(srctree)/drivers/misc/mediatek/lcm/inc
+diff --git a/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c
+new file mode 100644
+index 000000000..433b0473d
+--- /dev/null
++++ b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c
+@@ -0,0 +1,736 @@
++/*
++ * Copyright (C) 2015 MediaTek Inc.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++
++#ifdef BUILD_LK
++#include <string.h>
++#include <platform/mt_gpio.h>
++#include <platform/mt_pmic.h>
++#include <platform/upmu_common.h>
++#include <platform/mt_i2c.h>
++#include <platform/mt_pmic.h>
++#elif defined(BUILD_UBOOT)
++#include <asm/arch/mt_gpio.h>
++#else
++#include <linux/wait.h>
++#include <linux/platform_device.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
++#include <asm-generic/gpio.h>
++#include <linux/string.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/consumer.h>
++#endif
++
++#ifdef CONFIG_OF
++#include <linux/regulator/consumer.h>
++#endif
++
++#include "lcm_drv.h"
++static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output);
++#ifndef BUILD_LK
++static unsigned int LCD_RST_PIN;
++static unsigned int LCD_PWR_EN_PIN;
++static unsigned int LCD_PWR_BIAS_ENP_PIN;
++void lcm_request_gpio_control(struct device *dev)
++{
++	LCD_RST_PIN = of_get_named_gpio(dev->of_node, "lcd_rst_pin", 0);
++	gpio_request(LCD_RST_PIN, "LCD_RST_PIN");
++
++	LCD_PWR_EN_PIN = of_get_named_gpio(dev->of_node, "lcd_pwr_en_pin", 0);
++	gpio_request(LCD_PWR_EN_PIN, "LCD_PWR_EN_PIN");
++
++	LCD_PWR_BIAS_ENP_PIN =
++		of_get_named_gpio(dev->of_node, "lcd_pwr_bias_enp_pin", 0);
++	gpio_request(LCD_PWR_BIAS_ENP_PIN, "LCD_PWR_BIAS_ENP_PIN");
++}
++
++static int lcm_driver_probe(struct device *dev, void const *data)
++{
++	lcm_request_gpio_control(dev);
++	lcm_set_gpio_output(LCD_PWR_EN_PIN, 1);
++	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, 1);
++
++	return 0;
++}
++
++static const struct of_device_id lcm_platform_of_match[] = {
++	{
++	 .compatible = "jdi,jd9365_dsi_vdo",
++	 .data = 0,
++	 }, {
++	     /* sentinel */
++	}
++};
++
++MODULE_DEVICE_TABLE(of, platform_of_match);
++
++static int lcm_platform_probe(struct platform_device *pdev)
++{
++	const struct of_device_id *id;
++
++	id = of_match_node(lcm_platform_of_match, pdev->dev.of_node);
++	if (!id)
++		return -ENODEV;
++
++	return lcm_driver_probe(&pdev->dev, id->data);
++}
++
++static struct platform_driver lcm_driver = {
++	.probe = lcm_platform_probe,
++	.driver = {
++		   .name = "jd9365_dsi_vdo",
++		   .owner = THIS_MODULE,
++		   .of_match_table = lcm_platform_of_match,
++		   },
++};
++
++static int __init lcm_init(void)
++{
++	pr_debug("LCM: register lcm init driver done\n");
++	if (platform_driver_register(&lcm_driver)) {
++		pr_notice("LCM: failed to register this driver!\n");
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++static void __exit lcm_exit(void)
++{
++	platform_driver_unregister(&lcm_driver);
++}
++
++late_initcall(lcm_init);
++module_exit(lcm_exit);
++MODULE_AUTHOR("mediatek");
++MODULE_DESCRIPTION("LCM display subsystem driver");
++MODULE_LICENSE("GPL");
++#endif
++
++/* ----------------------------------------------------------------- */
++/* Local Constants */
++/* ----------------------------------------------------------------- */
++#define LCM_DSI_CMD_MODE				0
++#define FRAME_WIDTH (480)
++#define FRAME_HEIGHT (1280)
++
++#define GPIO_OUT_ONE 1
++#define GPIO_OUT_ZERO 0
++
++#ifdef GPIO_LCM_RST
++#define GPIO_LCD_RST      GPIO_LCM_RST
++#endif
++
++#ifdef GPIO_LCM_PWR_EN
++#define GPIO_LCD_PWR_EN      GPIO_LCM_PWR_EN
++#else
++#define GPIO_LCD_PWR_EN		0xFFFFFFFF
++#endif
++
++#ifdef GPIO_LCD_BIAS_ENP_PIN
++#define GPIO_LCD_BIAS_ENP      GPIO_LCD_BIAS_ENP_PIN
++#endif
++
++static struct LCM_UTIL_FUNCS lcm_util;
++
++#define SET_RESET_PIN(v) (lcm_util.set_reset_pin((v)))
++
++#define UDELAY(n) (lcm_util.udelay(n))
++#define MDELAY(n) (lcm_util.mdelay(n))
++
++/* --------------------------------------------------------------------- */
++/* Local Functions */
++/* --------------------------------------------------------------------- */
++#define dsi_set_cmdq_V2(cmd, count, ppara, force_update) \
++	lcm_util.dsi_set_cmdq_V2(cmd, count, ppara, force_update)
++#define dsi_set_cmdq(pdata, queue_size, force_update) \
++	lcm_util.dsi_set_cmdq(pdata, queue_size, force_update)
++#define wrtie_cmd(cmd) \
++	lcm_util.dsi_write_cmd(cmd)
++#define write_regs(addr, pdata, byte_nums) \
++	lcm_util.dsi_write_regs(addr, pdata, byte_nums)
++#define read_reg(cmd) \
++	lcm_util.dsi_dcs_read_lcm_reg(cmd)
++#define read_reg_v2(cmd, buffer, buffer_size) \
++	lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
++/* ------------------------------------------------ */
++/* Local Constants */
++/* ------------------------------------------------ */
++#define REGFLAG_DELAY                               0xFC
++#define REGFLAG_END_OF_TABLE                        0xFD
++/* END OF REGISTERS MARKER */
++
++#ifndef TRUE
++#define TRUE 1
++#endif
++
++#ifndef FALSE
++#define FALSE 0
++#endif
++
++/* ---------------------------------------------------------------- */
++/* Local Variables */
++/* ---------------------------------------------------------------- */
++static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output)
++{
++	if (GPIO == 0xFFFFFFFF) {
++#ifdef BUILD_LK
++		printf("[LK/LCM] GPIO_LCD_PWR_EN =   0x%x\n", GPIO_LCD_PWR_EN);
++		printf("[LK/LCM] GPIO_LCD_BIAS_ENP =   0x%x\n",
++			GPIO_LCD_BIAS_ENP);
++		printf("[LK/LCM] GPIO_LCM_RST =   0x%x\n", GPIO_LCD_RST);
++#else
++		pr_debug("[Kernel/LCM] GPIO_LCD_PWR_EN =   0x%x\n",
++			LCD_PWR_EN_PIN);
++		pr_debug("[Kernel/LCM] GPIO_LCD_BIAS_ENP =   0x%x\n",
++			LCD_PWR_BIAS_ENP_PIN);
++		pr_debug("[Kernel/LCM] GPIO_LCM_RST =   0x%x\n", LCD_RST_PIN);
++#endif
++		return;
++	}
++#ifdef BUILD_LK
++	mt_set_gpio_mode(GPIO, GPIO_MODE_00);
++	mt_set_gpio_dir(GPIO, GPIO_DIR_OUT);
++	mt_set_gpio_out(GPIO, (output > 0) ? GPIO_OUT_ONE : GPIO_OUT_ZERO);
++#else
++	gpio_direction_output(GPIO, output);
++	gpio_set_value(GPIO, output);
++#endif
++}
++
++struct LCM_setting_table {
++	unsigned char cmd;
++	unsigned char count;
++	unsigned char para_list[64];
++};
++
++#ifndef BUILD_LK
++static struct LCM_setting_table lcm_suspend_setting[] = {
++	{0x28, 0, {} },
++	{0x10, 0, {} },
++	{REGFLAG_DELAY, 120, {} },
++	{REGFLAG_END_OF_TABLE, 0x00, {} }
++};
++#endif
++
++static struct LCM_setting_table lcm_initialization_setting[] = {
++	{0xE0, 1, {0x00} },
++
++	{0xE1, 1, {0x93} },
++	{0xE2, 1, {0x65} },
++	{0xE3, 1, {0xF8} },
++
++	{0xE0, 1, {0x04} },
++	{0x2D, 1, {0x03} },
++	{0xE0, 1, {0x00} },
++
++	{0x70, 1, {0x10} },
++	{0x71, 1, {0x13} },
++	{0x72, 1, {0x06} },
++	{0x75, 1, {0x03} },
++	{0x80, 1, {0x03} },
++
++	{0xE0, 1, {0x01} },
++
++	{0x00, 1, {0x00} },
++	{0x01, 1, {0xB5} },
++	{0x03, 1, {0x00} },
++	{0x04, 1, {0xA0} },
++
++	{0x0A, 1, {0x07} },
++	{0x0C, 1, {0x74} },
++
++	{0x17, 1, {0x00} },
++	{0x18, 1, {0xD7} },
++	{0x19, 1, {0x01} },
++	{0x1A, 1, {0x00} },
++	{0x1B, 1, {0xD7} },
++	{0x1C, 1, {0x01} },
++
++	{0x1F, 1, {0x74} },
++	{0x20, 1, {0x19} },
++	{0x21, 1, {0x19} },
++	{0x22, 1, {0x0E} },
++	{0x27, 1, {0x43} },
++
++	{0x37, 1, {0x09} },
++	{0x38, 1, {0x04} },
++	{0x39, 1, {0x08} },
++	{0x3A, 1, {0x18} },
++	{0x3B, 1, {0x18} },
++	{0x3C, 1, {0x72} },
++	{0x3E, 1, {0xFF} },
++	{0x3E, 1, {0xFF} },
++	{0x3F, 1, {0xFF} },
++
++	{0x40, 1, {0x04} },
++	{0x41, 1, {0xA0} },
++
++	{0x43, 1, {0x08} },
++	{0x44, 1, {0x07} },
++	{0x45, 1, {0x30} },
++
++	{0x55, 1, {0x01} },
++	{0x56, 1, {0x01} },
++	{0x57, 1, {0x65} },
++	{0x58, 1, {0x0A} },
++	{0x59, 1, {0x0A} },
++	{0x5A, 1, {0x28} },
++	{0x5B, 1, {0x0F} },
++
++	{0x5D, 1, {0x7C} },
++	{0x5E, 1, {0x5F} },
++	{0x5F, 1, {0x4D} },
++	{0x60, 1, {0x3F} },
++	{0x61, 1, {0x39} },
++	{0x62, 1, {0x29} },
++	{0x63, 1, {0x2B} },
++	{0x64, 1, {0x12} },
++	{0x65, 1, {0x28} },
++	{0x66, 1, {0x24} },
++	{0x67, 1, {0x22} },
++	{0x68, 1, {0x3E} },
++	{0x69, 1, {0x2C} },
++	{0x6A, 1, {0x33} },
++	{0x6B, 1, {0x26} },
++	{0x6C, 1, {0x23} },
++	{0x6D, 1, {0x18} },
++	{0x6E, 1, {0x09} },
++	{0x6F, 1, {0x00} },
++
++	{0x70, 1, {0x7C} },
++	{0x71, 1, {0x5F} },
++	{0x72, 1, {0x4D} },
++	{0x73, 1, {0x3F} },
++	{0x74, 1, {0x39} },
++	{0x75, 1, {0x29} },
++	{0x76, 1, {0x2B} },
++	{0x77, 1, {0x12} },
++	{0x78, 1, {0x28} },
++	{0x79, 1, {0x24} },
++	{0x7A, 1, {0x22} },
++	{0x7B, 1, {0x3E} },
++	{0x7C, 1, {0x2C} },
++	{0x7D, 1, {0x33} },
++	{0x7E, 1, {0x26} },
++	{0x7F, 1, {0x23} },
++	{0x80, 1, {0x18} },
++	{0x81, 1, {0x09} },
++	{0x82, 1, {0x00} },
++
++	{0xE0, 1, {0x02} },
++	{0x00, 1, {0x37} },
++	{0x01, 1, {0x17} },
++	{0x02, 1, {0x0A} },
++	{0x03, 1, {0x06} },
++	{0x04, 1, {0x08} },
++	{0x05, 1, {0x04} },
++	{0x06, 1, {0x00} },
++	{0x07, 1, {0x1F} },
++	{0x08, 1, {0x1F} },
++	{0x09, 1, {0x1F} },
++	{0x0A, 1, {0x1F} },
++	{0x0B, 1, {0x1F} },
++	{0x0C, 1, {0x1F} },
++	{0x0D, 1, {0x1F} },
++	{0x0E, 1, {0x1F} },
++	{0x0F, 1, {0x1F} },
++	{0x10, 1, {0x3F} },
++	{0x11, 1, {0x1F} },
++	{0x12, 1, {0x1F} },
++	{0x13, 1, {0x1E} },
++	{0x14, 1, {0x10} },
++	{0x15, 1, {0x1F} },
++
++	{0x16, 1, {0x37} },
++	{0x17, 1, {0x17} },
++	{0x18, 1, {0x0B} },
++	{0x19, 1, {0x07} },
++	{0x1A, 1, {0x09} },
++	{0x1B, 1, {0x05} },
++	{0x1C, 1, {0x01} },
++	{0x1D, 1, {0x1F} },
++	{0x1E, 1, {0x1F} },
++	{0x1F, 1, {0x1F} },
++	{0x20, 1, {0x1F} },
++	{0x21, 1, {0x1F} },
++	{0x22, 1, {0x1F} },
++	{0x23, 1, {0x1F} },
++	{0x24, 1, {0x1F} },
++	{0x25, 1, {0x1F} },
++	{0x26, 1, {0x1F} },
++	{0x27, 1, {0x1F} },
++	{0x28, 1, {0x1F} },
++	{0x29, 1, {0x1E} },
++	{0x2A, 1, {0x11} },
++	{0x2B, 1, {0x1F} },
++
++	{0x2C, 1, {0x37} },
++	{0x2D, 1, {0x17} },
++	{0x2E, 1, {0x05} },
++	{0x2F, 1, {0x09} },
++	{0x30, 1, {0x07} },
++	{0x31, 1, {0x0B} },
++	{0x32, 1, {0x11} },
++	{0x33, 1, {0x1F} },
++	{0x34, 1, {0x1F} },
++	{0x35, 1, {0x1F} },
++	{0x36, 1, {0x1F} },
++	{0x37, 1, {0x1F} },
++	{0x38, 1, {0x1F} },
++	{0x39, 1, {0x1F} },
++	{0x3A, 1, {0x1F} },
++	{0x3B, 1, {0x1F} },
++	{0x3C, 1, {0x3F} },
++	{0x3D, 1, {0x1F} },
++	{0x3E, 1, {0x1E} },
++	{0x3F, 1, {0x1F} },
++	{0x40, 1, {0x01} },
++	{0x41, 1, {0x1F} },
++
++	{0x42, 1, {0x38} },
++	{0x43, 1, {0x18} },
++	{0x44, 1, {0x04} },
++	{0x45, 1, {0x08} },
++	{0x46, 1, {0x06} },
++	{0x47, 1, {0x0A} },
++	{0x48, 1, {0x10} },
++	{0x49, 1, {0x1F} },
++	{0x4A, 1, {0x1F} },
++	{0x4B, 1, {0x1F} },
++	{0x4C, 1, {0x1F} },
++	{0x4D, 1, {0x1F} },
++	{0x4E, 1, {0x1F} },
++	{0x4F, 1, {0x1F} },
++	{0x50, 1, {0x1F} },
++	{0x51, 1, {0x1F} },
++	{0x52, 1, {0x1F} },
++	{0x53, 1, {0x1F} },
++	{0x54, 1, {0x1E} },
++	{0x55, 1, {0x1F} },
++	{0x56, 1, {0x00} },
++	{0x57, 1, {0x1F} },
++
++	{0x58, 1, {0x10} },
++	{0x59, 1, {0x00} },
++	{0x5A, 1, {0x00} },
++	{0x5B, 1, {0x10} },
++	{0x5C, 1, {0x01} },
++	{0x5D, 1, {0x50} },
++	{0x5E, 1, {0x01} },
++	{0x5F, 1, {0x02} },
++	{0x60, 1, {0x30} },
++	{0x61, 1, {0x01} },
++	{0x62, 1, {0x02} },
++	{0x63, 1, {0x06} },
++	{0x64, 1, {0x6A} },
++	{0x65, 1, {0x55} },
++	{0x66, 1, {0x08} },
++	{0x67, 1, {0x73} },
++	{0x68, 1, {0x05} },
++	{0x69, 1, {0x08} },
++	{0x6A, 1, {0x6E} },
++	{0x6B, 1, {0x00} },
++	{0x6C, 1, {0x00} },
++	{0x6D, 1, {0x00} },
++	{0x6E, 1, {0x00} },
++	{0x6F, 1, {0x88} },
++	{0x70, 1, {0x00} },
++	{0x71, 1, {0x00} },
++	{0x72, 1, {0x06} },
++	{0x73, 1, {0x7B} },
++	{0x74, 1, {0x00} },
++	{0x75, 1, {0x80} },
++	{0x76, 1, {0x00} },
++	{0x77, 1, {0x0D} },
++	{0x78, 1, {0x18} },
++	{0x79, 1, {0x00} },
++	{0x7A, 1, {0x00} },
++	{0x7B, 1, {0x00} },
++	{0x7C, 1, {0x00} },
++	{0x7D, 1, {0x03} },
++	{0x7E, 1, {0x7B} },
++	{0xE0, 1, {0x04} },
++	{0x04, 1, {0x01} },
++	{0x0E, 1, {0x38} },
++	{0x2B, 1, {0x2B} },
++	{0x2E, 1, {0x44} },
++	{0xE0, 1, {0x00} },
++	{0xE6, 1, {0x02} },
++	{0xE6, 1, {0x02} },
++
++	{0x11, 0, {} },
++	{REGFLAG_DELAY, 20, {} },
++	{0x29, 0, {} },
++	{REGFLAG_DELAY, 5, {} },
++
++	{0x35, 1, {0x00} },
++	{REGFLAG_END_OF_TABLE, 0x00, {} }
++};
++
++static void dsi_send_cmdq_tinno(unsigned int cmd, unsigned char count,
++	unsigned char *para_list, unsigned char force_update)
++{
++	unsigned int item[16];
++	unsigned char dsi_cmd = (unsigned char)cmd;
++	unsigned char dc;
++	int index = 0, length = 0;
++
++	memset(item, 0, sizeof(item));
++	if (count + 1 > 60)
++		return;
++
++	if (count == 0) {
++		item[0] = 0x0500 | (dsi_cmd << 16);
++		length = 1;
++	} else if (count == 1) {
++		item[0] = 0x1500 | (dsi_cmd << 16) | (para_list[0] << 24);
++		length = 1;
++	} else {
++		/* Count include command. */
++		item[0] = 0x3902 | ((count + 1) << 16);
++		++length;
++		while (1) {
++			if (index == count + 1)
++				break;
++			if (index == 0)
++				dc = cmd;
++			else
++				dc = para_list[index - 1];
++			/* an item make up of 4data. */
++			item[index / 4 + 1] |= (dc << (8 * (index % 4)));
++			if (index % 4 == 0)
++				++length;
++			++index;
++		}
++	}
++
++	dsi_set_cmdq(item, length, force_update);
++}
++
++
++static void push_table(struct LCM_setting_table *table, unsigned int count,
++		       unsigned char force_update)
++{
++	unsigned int i;
++	unsigned int cmd;
++
++	for (i = 0; i < count; i++) {
++		cmd = table[i].cmd;
++		switch (cmd) {
++		case REGFLAG_DELAY:
++			MDELAY(table[i].count);
++			break;
++
++		case REGFLAG_END_OF_TABLE:
++			break;
++
++		default:
++			dsi_send_cmdq_tinno(cmd, table[i].count,
++				table[i].para_list, force_update);
++			/* dsi_set_cmdq_V2(cmd, table[i].count,
++			 *	table[i].para_list, force_update);
++			 */
++		}
++	}
++}
++
++static void init_lcm_registers(void)
++{
++	push_table(lcm_initialization_setting,
++		   sizeof(lcm_initialization_setting) /
++		   sizeof(struct LCM_setting_table), 1);
++}
++
++/* ------------------------------------------------------------------- */
++/* LCM Driver Implementations */
++/* ------------------------------------------------------------------- */
++static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
++{
++	memcpy(&lcm_util, util, sizeof(struct LCM_UTIL_FUNCS));
++}
++
++static void lcm_get_params(struct LCM_PARAMS *params)
++{
++	memset(params, 0, sizeof(struct LCM_PARAMS));
++
++	params->type = LCM_TYPE_DSI;
++
++	params->width = FRAME_WIDTH;
++	params->height = FRAME_HEIGHT;
++	params->density = 213;
++#if (LCM_DSI_CMD_MODE)
++	params->dsi.mode = CMD_MODE;
++#else
++	params->dsi.mode = SYNC_PULSE_VDO_MODE;
++#endif
++
++	/* DSI */
++	/* Command mode setting */
++	params->dsi.LANE_NUM = LCM_FOUR_LANE;
++	/* The following defined the fomat for data coming from LCD engine. */
++	params->dsi.data_format.color_order = LCM_COLOR_ORDER_RGB;
++	params->dsi.data_format.trans_seq = LCM_DSI_TRANS_SEQ_MSB_FIRST;
++	params->dsi.data_format.padding = LCM_DSI_PADDING_ON_LSB;
++	params->dsi.data_format.format = LCM_DSI_FORMAT_RGB888;
++
++	params->dsi.intermediat_buffer_num = 2;
++	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
++
++#ifdef BUILD_LK
++	params->dsi.esd_check_enable = 1;
++	params->dsi.customization_esd_check_enable = 1;
++	params->dsi.lcm_esd_check_table[0].cmd = 0x0A;
++	params->dsi.lcm_esd_check_table[0].count = 1;
++	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x9c;
++#endif
++	params->dsi.vertical_sync_active = 4;
++	params->dsi.vertical_backporch = 4;
++	params->dsi.vertical_frontporch = 16;
++	params->dsi.vertical_active_line = FRAME_HEIGHT;
++
++	params->dsi.horizontal_sync_active = 55;
++	params->dsi.horizontal_backporch = 53;
++	params->dsi.horizontal_frontporch = 24;
++	params->dsi.horizontal_active_pixel = FRAME_WIDTH;
++
++	/* video mode timing */
++	params->dsi.word_count = FRAME_WIDTH * 3;
++
++	params->dsi.PLL_CLOCK = 200; /* 270 */
++}
++
++static void lcm_init_lcm(void)
++{
++#ifdef BUILD_LK
++	printf("[LK/LCM] lcm_init() enter\n");
++
++	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ONE);
++	MDELAY(20);
++
++	lcm_set_gpio_output(GPIO_LCD_PWR_EN, GPIO_OUT_ONE);
++	MDELAY(20);
++
++	lcm_set_gpio_output(GPIO_LCD_BIAS_ENP, GPIO_OUT_ONE);
++	MDELAY(20);
++
++	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ZERO);
++	MDELAY(10);
++
++	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ONE);
++	MDELAY(10);
++
++	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ZERO);
++	MDELAY(120);
++
++	init_lcm_registers();
++#else
++	pr_notice("[Kernel/LCM] lcm_init() enter\n");
++
++	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ONE);
++	MDELAY(20);
++
++	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ONE);
++#endif
++}
++
++void lcm_suspend(void)
++{
++#ifndef BUILD_LK
++	pr_notice("[Kernel/LCM] %s enter\n", __func__);
++
++	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
++	MDELAY(5);
++
++	push_table(lcm_suspend_setting,
++		   sizeof(lcm_suspend_setting) /
++		   sizeof(struct LCM_setting_table), 1);
++
++	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ZERO);
++	MDELAY(10);
++
++	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ZERO);
++#endif
++}
++
++void lcm_resume(void)
++{
++#ifndef BUILD_LK
++	pr_notice("[Kernel/LCM] %s enter\n", __func__);
++
++	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ONE);
++	MDELAY(5);
++
++	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ONE);
++	MDELAY(5);
++
++	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
++	MDELAY(10);
++
++	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ONE);
++	MDELAY(10);
++
++	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
++	MDELAY(10);
++
++	init_lcm_registers();
++#endif
++}
++
++#if (LCM_DSI_CMD_MODE)
++static void lcm_update(unsigned int x, unsigned int y,
++		unsigned int width, unsigned int height)
++{
++	unsigned int x0 = x;
++	unsigned int y0 = y;
++	unsigned int x1 = x0 + width - 1;
++	unsigned int y1 = y0 + height - 1;
++
++	unsigned char x0_MSB = ((x0 >> 8) & 0xFF);
++	unsigned char x0_LSB = (x0 & 0xFF);
++	unsigned char x1_MSB = ((x1 >> 8) & 0xFF);
++	unsigned char x1_LSB = (x1 & 0xFF);
++	unsigned char y0_MSB = ((y0 >> 8) & 0xFF);
++	unsigned char y0_LSB = (y0 & 0xFF);
++	unsigned char y1_MSB = ((y1 >> 8) & 0xFF);
++	unsigned char y1_LSB = (y1 & 0xFF);
++
++	unsigned int data_array[16];
++
++	data_array[0] = 0x00053902;
++	data_array[1] = (x1_MSB << 24) | (x0_LSB << 16) | (x0_MSB << 8) | 0x2a;
++	data_array[2] = (x1_LSB);
++	dsi_set_cmdq(data_array, 3, 1);
++
++	data_array[0] = 0x00053902;
++	data_array[1] = (y1_MSB << 24) | (y0_LSB << 16) | (y0_MSB << 8) | 0x2b;
++	data_array[2] = (y1_LSB);
++	dsi_set_cmdq(data_array, 3, 1);
++
++	data_array[0] = 0x002c3909;
++	dsi_set_cmdq(data_array, 1, 0);
++}
++#endif
++
++struct LCM_DRIVER hx8394d_hd480_dsi_vdo_lcm_drv = {
++	.name = "hx8394d_hd480_dsi_vdo",
++	.set_util_funcs = lcm_set_util_funcs,
++	.get_params = lcm_get_params,
++	.init = lcm_init_lcm,
++	.suspend = lcm_suspend,
++	.resume = lcm_resume,
++};
+diff --git a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c b/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c
+index e58ffa50f..aeff467a3 100644
+--- a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c
++++ b/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c
+@@ -1170,6 +1170,9 @@ struct LCM_DRIVER *lcm_driver_list[] = {
+ #if defined(JD9365_HD720_DSI)
+ 	&jd9365_hd720_dsi_lcm_drv,
+ #endif
++#if defined(HX8394D_HD480_DSI_VDO)
++	&hx8394d_hd480_dsi_vdo_lcm_drv,
++#endif
+ #if defined(NT36672_FHDP_DSI_VDO_AUO)
+ 	&nt36672_fhdp_dsi_vdo_auo_lcm_drv,
+ #endif
+diff --git a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.h b/drivers/misc/mediatek/lcm/mt65xx_lcm_list.h
+index 35ea29d1b..3106b4e1e 100644
+--- a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.h
++++ b/drivers/misc/mediatek/lcm/mt65xx_lcm_list.h
+@@ -300,6 +300,7 @@ extern struct LCM_DRIVER nt51021_wuxga_dsi_vdo_mt8173_lcm_drv;
+ extern struct LCM_DRIVER ili9881c_hdp_dsi_vdo_ilitek_rt5081_lcm_drv_ebbg;
+ extern struct LCM_DRIVER hx8394f_hd720_dsi_vdo_tianma_lcm_drv;
+ extern struct LCM_DRIVER jd9365_hd720_dsi_lcm_drv;
++extern struct LCM_DRIVER hx8394d_hd480_dsi_vdo_lcm_drv;
+ extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_lcm_drv;
+ extern struct LCM_DRIVER nt36672_fhdp_dsi_vdo_auo_laneswap_lcm_drv;
+ extern struct LCM_DRIVER nt35521_hd_dsi_vdo_truly_nt50358_lcm_drv;
+diff --git a/drivers/misc/mediatek/leds/Makefile b/drivers/misc/mediatek/leds/Makefile
+index 4eae6c6f3..3cf4ed6a9 100644
+--- a/drivers/misc/mediatek/leds/Makefile
++++ b/drivers/misc/mediatek/leds/Makefile
+@@ -10,6 +10,12 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/leds
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/leds/$(MTK_PLATFORM)
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
++
+ ifdef CONFIG_LEDS_MTK_DISP
+ obj-$(CONFIG_LEDS_MTK_DISP)		+= leds-mtk-disp.o
+ else ifdef CONFIG_LEDS_MTK_PWM
+diff --git a/drivers/misc/mediatek/m4u/mt6768/Makefile b/drivers/misc/mediatek/m4u/mt6768/Makefile
+index ceb87bd45..b18bb4a62 100644
+--- a/drivers/misc/mediatek/m4u/mt6768/Makefile
++++ b/drivers/misc/mediatek/m4u/mt6768/Makefile
+@@ -11,6 +11,8 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)
+ ccflags-y += -I$(srctree)/drivers/staging/android/ion
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/gud/$(MTK_PLATFORM)/gud/MobiCoreKernelApi/public
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/gud/$(MTK_PLATFORM)/gud/MobiCoreKernelApi/include
+diff --git a/drivers/misc/mediatek/mdp/Makefile b/drivers/misc/mediatek/mdp/Makefile
+index d9ee4178e..7e34827a4 100644
+--- a/drivers/misc/mediatek/mdp/Makefile
++++ b/drivers/misc/mediatek/mdp/Makefile
+@@ -52,11 +52,14 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi/ \
+ 	     -I$(srctree)/drivers/staging/android/ion \
+ 	     -I$(srctree)/drivers/staging/android/ion/mtk
+ 
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/mt6768
+ ccflags-$(CONFIG_MTK_CMDQ_MBOX_EXT) += -I$(srctree)/drivers/misc/mediatek/cmdq/mailbox/
+ 
+ ifeq ($(CONFIG_MTK_CMDQ_V3),y)
+ ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6739" "mt6768" "mt6771" "mt8168" "mt6785"))
+-	ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/ \
++	ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/mt6768 \
+ 		-I$(srctree)/drivers/misc/mediatek/cmdq/v3/$(MTK_PLATFORM)
+ endif
+ else ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt8167"))
+diff --git a/drivers/misc/mediatek/mmdvfs/Makefile b/drivers/misc/mediatek/mmdvfs/Makefile
+index 18dd7a485..e9016e2a5 100644
+--- a/drivers/misc/mediatek/mmdvfs/Makefile
++++ b/drivers/misc/mediatek/mmdvfs/Makefile
+@@ -11,6 +11,10 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmdvfs
++CFLAGS_mmdvfs_pmqos.o := -I$(src)
++
+ ccflags-y += -I$(srctree)/drivers/clk/mediatek
+ ccflags-y += -I$(srctree)/drivers/devfreq
+ ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek/
+diff --git a/drivers/misc/mediatek/mtee/Makefile b/drivers/misc/mediatek/mtee/Makefile
+index f807a3fd1..cad7ed83c 100644
+--- a/drivers/misc/mediatek/mtee/Makefile
++++ b/drivers/misc/mediatek/mtee/Makefile
+@@ -19,7 +19,7 @@
+ # inconsistent state and crashed.
+ KCOV_INSTRUMENT_tz_system.o := n
+ 
+-ccflags-y += -Werror
++ccflags-y += 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/trustzone
+ 
+ obj-y += tz_module.o
+diff --git a/drivers/misc/mediatek/perf/Makefile b/drivers/misc/mediatek/perf/Makefile
+index aa10034c9..c29a86b32 100644
+--- a/drivers/misc/mediatek/perf/Makefile
++++ b/drivers/misc/mediatek/perf/Makefile
+@@ -11,7 +11,12 @@
+ # See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ LINUXINCLUDE += -include $(srctree)/kernel/sched/sched.h
++CFLAGS_perf_tracker.o := -I$(src)
++
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/vcorefs_v3/
+diff --git a/drivers/misc/mediatek/performance/Makefile b/drivers/misc/mediatek/performance/Makefile
+index a79ab0bb1..a459696c5 100644
+--- a/drivers/misc/mediatek/performance/Makefile
++++ b/drivers/misc/mediatek/performance/Makefile
+@@ -13,6 +13,7 @@
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/performance/perf_ioctl/ \
+ 		    -I$(srctree)/drivers/misc/mediatek/performance/include/ \
+ 		    -I$(srctree)/drivers/misc/mediatek/base/power/include/ \
++		    -I$(srctree)/drivers/misc/mediatek/include/mt-plat/ \
+ 
+ 
+ obj-y += perfmgr_main.o
+diff --git a/drivers/misc/mediatek/performance/eara_thermal/Makefile b/drivers/misc/mediatek/performance/eara_thermal/Makefile
+index 712156b90..954d53743 100644
+--- a/drivers/misc/mediatek/performance/eara_thermal/Makefile
++++ b/drivers/misc/mediatek/performance/eara_thermal/Makefile
+@@ -13,6 +13,7 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program. If not, see <http://www.gnu.org/licenses/>.
+ #
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ MTK_TOP = $(srctree)/drivers/misc/mediatek/
+ EARA_THRM_TOP = $(srctree)/drivers/misc/mediatek/performance/eara_thermal
+ FPSGO_TOP = $(srctree)/drivers/misc/mediatek/performance/fpsgo_v3/
+@@ -21,6 +22,8 @@ obj-y += platform/$(MTK_PLATFORM)/thermal_budget_platform.o
+ obj-y += thermal_budget.o
+ obj-y += thermal_base.o
+ 
++ccflags-y += -I$(EARA_THRM_TOP)/
++
+ ccflags-y += -I$(MTK_TOP)/thermal/common/inc/
+ ccflags-y += -I$(MTK_TOP)/thermal/$(MTK_PLATFORM)/inc/
+ ccflags-y += -I$(MTK_TOP)/base/power/$(MTK_PLATFORM)/
+@@ -41,4 +44,5 @@ endif
+ ccflags-y += \
+         -I$(srctree)/include/ \
+         -I$(MTK_TOP)/include/ \
++        -I$(MTK_TOP)/include/mt-plat/$(MTK_PLATFORM)/include/ \
+         -I$(MTK_TOP)/include/mt-plat/$(MTK_PLATFORM)/include/mach/
+diff --git a/drivers/misc/mediatek/performance/observer/platform/mt6768/Makefile b/drivers/misc/mediatek/performance/observer/platform/mt6768/Makefile
+index 25d577233..e3d7b2de8 100644
+--- a/drivers/misc/mediatek/performance/observer/platform/mt6768/Makefile
++++ b/drivers/misc/mediatek/performance/observer/platform/mt6768/Makefile
+@@ -6,6 +6,7 @@ ccflags-y += -I$(MTK_TOP)/performance/observer
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/qos/mt6768/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
+ ccflags-y += -I$(srctree)/drivers/devfreq
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6768/include/
+ 
+ obj-y += qos_pfm.o
+ obj-y += obpfm_qos_bound.o
+diff --git a/drivers/misc/mediatek/pmic/mt6357/v1/Makefile b/drivers/misc/mediatek/pmic/mt6357/v1/Makefile
+index a8df6fd2f..f68d36636 100644
+--- a/drivers/misc/mediatek/pmic/mt6357/v1/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6357/v1/Makefile
+@@ -12,7 +12,7 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+diff --git a/drivers/misc/mediatek/pmic/mt6358/v1/Makefile b/drivers/misc/mediatek/pmic/mt6358/v1/Makefile
+index 2964c635d..b74f37b8b 100644
+--- a/drivers/misc/mediatek/pmic/mt6358/v1/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6358/v1/Makefile
+@@ -6,7 +6,7 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+diff --git a/drivers/misc/mediatek/pmic/mt6359/v1/Makefile b/drivers/misc/mediatek/pmic/mt6359/v1/Makefile
+index 7fc0df1ce..f366e82c8 100644
+--- a/drivers/misc/mediatek/pmic/mt6359/v1/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6359/v1/Makefile
+@@ -6,7 +6,7 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+diff --git a/drivers/misc/mediatek/pmic/mt6359p/v1/Makefile b/drivers/misc/mediatek/pmic/mt6359p/v1/Makefile
+index 91634faff..b3f6b36f5 100644
+--- a/drivers/misc/mediatek/pmic/mt6359p/v1/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6359p/v1/Makefile
+@@ -12,7 +12,7 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/subpmic
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/v2
+diff --git a/drivers/misc/mediatek/pmic/mt6370/Makefile b/drivers/misc/mediatek/pmic/mt6370/Makefile
+index 5494e0de6..35df7138e 100644
+--- a/drivers/misc/mediatek/pmic/mt6370/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6370/Makefile
+@@ -1,4 +1,4 @@
+-subdir-ccflags-y += -Wall -Werror
++subdir-ccflags-y += -Wall 
+ ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
+ subdir-ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+diff --git a/drivers/misc/mediatek/pmic/mt6390/v1/Makefile b/drivers/misc/mediatek/pmic/mt6390/v1/Makefile
+index 08213ec53..b90c45091 100644
+--- a/drivers/misc/mediatek/pmic/mt6390/v1/Makefile
++++ b/drivers/misc/mediatek/pmic/mt6390/v1/Makefile
+@@ -12,7 +12,7 @@ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/misc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/sspm/
+diff --git a/drivers/misc/mediatek/power/Makefile b/drivers/misc/mediatek/power/Makefile
+index 541fd1c33..578d6f3fc 100644
+--- a/drivers/misc/mediatek/power/Makefile
++++ b/drivers/misc/mediatek/power/Makefile
+@@ -14,17 +14,17 @@ subdir-ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/battery
+ subdir-ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/tcpc/inc
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply/mediatek
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply/mediatek/misc
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/supply/mediatek
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/supply/mediatek/misc
+ 
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/mediatek/charger
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/flashlight/inc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/spm_v2/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+-subdir-ccflags-$(CONFIG_USB_MU3D_DRV) += -Werror -I$(srctree)/drivers/misc/mediatek/mu3d/drv
++subdir-ccflags-$(CONFIG_USB_MU3D_DRV) +=  -I$(srctree)/drivers/misc/mediatek/mu3d/drv
+ subdir-ccflags-$(CONFIG_USB_MTK_HDRC) += -I$(srctree)/drivers/misc/mediatek/usb20/
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/u3_switch
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/inc
+diff --git a/drivers/misc/mediatek/power/mt6765/Makefile b/drivers/misc/mediatek/power/mt6765/Makefile
+index 1b00df295..039a965c9 100644
+--- a/drivers/misc/mediatek/power/mt6765/Makefile
++++ b/drivers/misc/mediatek/power/mt6765/Makefile
+@@ -10,13 +10,13 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply/mediatek/charger
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/supply/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/flashlight/inc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/spm_v2/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+-subdir-ccflags-$(CONFIG_USB_MU3D_DRV) += -Werror -I$(srctree)/drivers/misc/mediatek/mu3d/drv
++subdir-ccflags-$(CONFIG_USB_MU3D_DRV) +=  -I$(srctree)/drivers/misc/mediatek/mu3d/drv
+ subdir-ccflags-$(CONFIG_USB_MTK_HDRC) += -I$(srctree)/drivers/misc/mediatek/usb20/
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/u3_switch
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/inc
+diff --git a/drivers/misc/mediatek/power/mt6768/Makefile b/drivers/misc/mediatek/power/mt6768/Makefile
+index 65c661eed..3ec0a06e5 100644
+--- a/drivers/misc/mediatek/power/mt6768/Makefile
++++ b/drivers/misc/mediatek/power/mt6768/Makefile
+@@ -10,13 +10,13 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/mediatek/charger
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/mediatek/charger
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/flashlight/inc
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/spm_v2/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb_c/tcpc/inc
+-subdir-ccflags-$(CONFIG_USB_MU3D_DRV) += -Werror -I$(srctree)/drivers/misc/mediatek/mu3d/drv
++subdir-ccflags-$(CONFIG_USB_MU3D_DRV) +=  -I$(srctree)/drivers/misc/mediatek/mu3d/drv
+ subdir-ccflags-$(CONFIG_USB_MTK_HDRC) += -I$(srctree)/drivers/misc/mediatek/usb20/
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/u3_switch
+ subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/inc
+diff --git a/drivers/misc/mediatek/smi/Makefile b/drivers/misc/mediatek/smi/Makefile
+index 5e2af4422..4372dca62 100644
+--- a/drivers/misc/mediatek/smi/Makefile
++++ b/drivers/misc/mediatek/smi/Makefile
+@@ -11,7 +11,11 @@
+ # GNU General Public License for more details.
+ #
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ ifeq ($(CONFIG_MTK_SMI_EXT), y)
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+ ccflags-y += -I$(srctree)/drivers/clk/mediatek/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/$(MTK_PLATFORM)/
+diff --git a/drivers/misc/mediatek/teei/300/tz_dcih/Makefile b/drivers/misc/mediatek/teei/300/tz_dcih/Makefile
+index 53f906632..2895c34f4 100644
+--- a/drivers/misc/mediatek/teei/300/tz_dcih/Makefile
++++ b/drivers/misc/mediatek/teei/300/tz_dcih/Makefile
+@@ -12,4 +12,4 @@
+ 
+ obj-$(CONFIG_MICROTRUST_VFS_DRIVER) += tz_dcih.o
+ obj-$(CONFIG_MICROTRUST_VFS_DRIVER) += tz_dcih_test.o
+-ccflags-y += -D DEBUG_DO -fno-pic -Werror
++ccflags-y += -D DEBUG_DO -fno-pic 
+diff --git a/drivers/misc/mediatek/teei/300/ut_tester/Makefile b/drivers/misc/mediatek/teei/300/ut_tester/Makefile
+index f38b19596..80aab9fe1 100644
+--- a/drivers/misc/mediatek/teei/300/ut_tester/Makefile
++++ b/drivers/misc/mediatek/teei/300/ut_tester/Makefile
+@@ -11,4 +11,4 @@
+ # GNU General Public License for more details.
+ 
+ obj-y += ut_tester.o
+-ccflags-y += -Werror
++ccflags-y += 
+diff --git a/drivers/misc/mediatek/timer/timesync/Makefile b/drivers/misc/mediatek/timer/timesync/Makefile
+index c208a9946..abdcc62d9 100644
+--- a/drivers/misc/mediatek/timer/timesync/Makefile
++++ b/drivers/misc/mediatek/timer/timesync/Makefile
+@@ -13,8 +13,11 @@
+ 
+ 
+ 
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+ 
+ ifeq ($(CONFIG_MTK_TINYSYS_SSPM_SUPPORT), y)
+diff --git a/drivers/misc/mediatek/tkcore/core/Makefile b/drivers/misc/mediatek/tkcore/core/Makefile
+index b18cd5d9b..98115e710 100644
+--- a/drivers/misc/mediatek/tkcore/core/Makefile
++++ b/drivers/misc/mediatek/tkcore/core/Makefile
+@@ -18,7 +18,7 @@ endif
+ 
+ M ?=$(srctree)/drivers/misc/mediatek/tkcore
+ 
+-#ccflags-y+=-Werror
++#ccflags-y+=
+ ccflags-y += -I$(M)/include/linux
+ ccflags-y += -I$(M)/include
+ ccflags-y += -I$(M)
+diff --git a/drivers/misc/mediatek/trusted_mem/Makefile b/drivers/misc/mediatek/trusted_mem/Makefile
+index 29d8caf32..f72ddb3b0 100644
+--- a/drivers/misc/mediatek/trusted_mem/Makefile
++++ b/drivers/misc/mediatek/trusted_mem/Makefile
+@@ -13,7 +13,7 @@
+ include $(srctree)/drivers/misc/mediatek/trusted_mem/Makefile.configs
+ 
+ # Force strictly compiler check
+-ccflags-y += -Werror
++ccflags-y += 
+ 
+ #==========================================================================
+ # Trusted Memory Subsystem Driver
+diff --git a/drivers/misc/mediatek/video/Makefile b/drivers/misc/mediatek/video/Makefile
+index 90e6555de..e741e451b 100644
+--- a/drivers/misc/mediatek/video/Makefile
++++ b/drivers/misc/mediatek/video/Makefile
+@@ -17,6 +17,15 @@
+ #
+ ################################################################################
+ 
++MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/dispsys
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/$(MTK_PLATFORM)/videox
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/common/layering_rule_base/v1.1
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi
++
+ ifneq ($(CONFIG_MTK_LCM), y)
+ 	obj-y += mtdummy/
+ else
+diff --git a/drivers/misc/mediatek/video/mt6768/videox/disp_recovery.c b/drivers/misc/mediatek/video/mt6768/videox/disp_recovery.c
+index e505a8a7f..64b3b3eda 100644
+--- a/drivers/misc/mediatek/video/mt6768/videox/disp_recovery.c
++++ b/drivers/misc/mediatek/video/mt6768/videox/disp_recovery.c
+@@ -705,7 +705,10 @@ static int primary_display_check_recovery_worker_kthread(void *data)
+ 	return 0;
+ }
+ 
+-extern int32_t nvt_update_firmware(char *firmware_name);
++__attribute__((weak)) int32_t nvt_update_firmware(char *firmware_name)
++{
++	return 0;
++}
+ 
+ /* ESD RECOVERY */
+ int primary_display_esd_recovery(void)
+diff --git a/drivers/mmc/host/mediatek/ComboA/Makefile b/drivers/mmc/host/mediatek/ComboA/Makefile
+index 8a2da516a..0bee5a570 100644
+--- a/drivers/mmc/host/mediatek/ComboA/Makefile
++++ b/drivers/mmc/host/mediatek/ComboA/Makefile
+@@ -31,6 +31,7 @@ ccflags-y += -I$(srctree)/drivers/devfreq
+ #workaround for include mmc/card/queue.h and mmc/core/core.h
+ ccflags-y += -I$(srctree)/drivers
+ ccflags-y += -I$(srctree)/drivers/mmc/host/mediatek/ComboA/$(MMC_FOLDER)
++ccflags-y += -I$(srctree)/drivers/mmc/host/mediatek/ComboA
+ 
+ ifeq ($(CONFIG_MTK_HW_FDE_AES),y)
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/fde_aes/$(subst ",,$(CONFIG_MTK_PLATFORM))
+diff --git a/drivers/pinctrl/mediatek/Makefile b/drivers/pinctrl/mediatek/Makefile
+index 2cfc78336..c0ebf8b8e 100644
+--- a/drivers/pinctrl/mediatek/Makefile
++++ b/drivers/pinctrl/mediatek/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++ccflags-y += -I$(srctree)/drivers/gpio
+ # Core
+ obj-$(CONFIG_PINCTRL_MTK)	+= pinctrl-mtk-common.o
+ ifneq ($(CONFIG_ARCH_MEDIATEK), n)
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
+index 1f1bf5593..92464ee40 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
+@@ -14,7 +14,7 @@
+ 
+ #include <dt-bindings/pinctrl/mt65xx.h>
+ #include <linux/gpio/consumer.h>
+-#include <../../gpio/gpiolib.h>
++#include "../../gpio/gpiolib.h"
+ #include <linux/delay.h>
+ #include "pinctrl-paris.h"
+ 
+diff --git a/drivers/power/supply/mediatek/Makefile b/drivers/power/supply/mediatek/Makefile
+index ea45a8bb9..9368fbdf9 100644
+--- a/drivers/power/supply/mediatek/Makefile
++++ b/drivers/power/supply/mediatek/Makefile
+@@ -13,10 +13,10 @@
+ 
+ 
+ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ ifneq ($(CONFIG_FPGA_EARLY_PORTING),y)
+ ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
+diff --git a/drivers/power/supply/mediatek/battery/Makefile b/drivers/power/supply/mediatek/battery/Makefile
+index 39cfa2572..e35f75f22 100644
+--- a/drivers/power/supply/mediatek/battery/Makefile
++++ b/drivers/power/supply/mediatek/battery/Makefile
+@@ -13,12 +13,13 @@
+ 
+ 
+ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/power/supply/mediatek/misc
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/supply/mediatek/misc
++subdir-ccflags-y +=  -I$(srctree)/drivers/power/supply/mediatek/battery
+ 
+ ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
+ 	obj-y += mtk_battery.o mtk_power_misc.o mtk_gauge_coulomb_service.o mtk_gauge_class.o mtk_battery_recovery.o mtk_battery_core.o
+diff --git a/drivers/power/supply/mediatek/charger/Makefile b/drivers/power/supply/mediatek/charger/Makefile
+index 08e1ca88d..bbb9906c1 100644
+--- a/drivers/power/supply/mediatek/charger/Makefile
++++ b/drivers/power/supply/mediatek/charger/Makefile
+@@ -12,8 +12,9 @@
+ #
+ 
+ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+ subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
+ subdir-ccflags-$(CONFIG_USB_MU3D_DRV) += -I$(srctree)/drivers/misc/mediatek/mu3d/drv
+diff --git a/drivers/power/supply/mediatek/charger/mtk_charger.c b/drivers/power/supply/mediatek/charger/mtk_charger.c
+index 26f3624ae..2f4f7818b 100644
+--- a/drivers/power/supply/mediatek/charger/mtk_charger.c
++++ b/drivers/power/supply/mediatek/charger/mtk_charger.c
+@@ -138,7 +138,10 @@ typedef enum {
+ 	PCBA_END,
+ } PCBA_CONFIG;
+ #endif
+-PCBA_CONFIG get_huaqin_pcba_config(void);
++__attribute__((weak)) PCBA_CONFIG get_huaqin_pcba_config(void)
++{
++	return PCBA_UNKNOW;
++}
+ PCBA_CONFIG pcba_to_thermal = PCBA_UNKNOW;
+ 
+ static int thermal_mitigation_dcp[THERMAL_MAX] = {2000000, 2000000, 2000000, 2000000, 2000000, 2000000, 2000000, 2000000, 1500000, 1500000, 1500000, 1000000,
+diff --git a/drivers/power/supply/mediatek/charger/smb1351-charger.c b/drivers/power/supply/mediatek/charger/smb1351-charger.c
+index e4f5423ee..00c1d1b3d 100644
+--- a/drivers/power/supply/mediatek/charger/smb1351-charger.c
++++ b/drivers/power/supply/mediatek/charger/smb1351-charger.c
+@@ -431,7 +431,7 @@ enum usbsw_state {
+ 	USBSW_USB,
+ };
+ 
+-static const enum power_supply_type const smblib_apsd_results[] = {
++static const enum power_supply_type smblib_apsd_results[] = {
+ 	POWER_SUPPLY_TYPE_UNKNOWN,
+ 	POWER_SUPPLY_TYPE_USB,
+ 	POWER_SUPPLY_TYPE_USB_CDP,
+@@ -667,7 +667,7 @@ static int smb1351_masked_write(struct smb1351_charger *chip, int reg,
+ 
+ static int smb1351_enable_volatile_writes(struct smb1351_charger *chip)
+ {
+-	int rc;
++	int rc = 0;
+ 
+ 	rc = smb1351_masked_write(chip, CMD_I2C_REG, CMD_BQ_CFG_ACCESS_BIT,
+ 							CMD_BQ_CFG_ACCESS_BIT);
+@@ -755,7 +755,7 @@ static int smb1351_set_usbsw_state(struct smb1351_charger *chip, int state)
+ 
+ static int rerun_apsd(struct smb1351_charger *chip)
+ {
+-	int rc;
++	int rc = 0;
+ 
+ 	pr_err("Reruning APSD\n");
+ 
+@@ -1161,7 +1161,7 @@ static void apsd_update_work(struct work_struct *work)
+ 
+ static void smb1351_rerun_aicl(struct smb1351_charger *chip)
+ {
+-	int rc;
++	int rc = 0;
+ 	rc = smb1351_masked_write(chip, CMD_INPUT_LIMIT_REG, 0x03, 0x00);
+ 	if (rc) {
+ 		pr_err("rerun aicl set 500 fail rc = %d\n", rc);
+@@ -1209,7 +1209,7 @@ static void smb1351_hvdcp_500_mode_check_work(struct work_struct *work)
+ 	struct smb1351_charger *chip = container_of(work,
+ 			struct smb1351_charger, hvdcp_500_mode_check_work.work);
+ 	u8 usb_mode;
+-	int rc;
++	int rc = 0;
+ 	if (thermal_is_500 == true) {
+ 		schedule_delayed_work(&chip->hvdcp_500_mode_check_work, msecs_to_jiffies(5000));
+ 		return;
+@@ -1240,7 +1240,7 @@ static void smb1351_sw_rerun_aicl_work(struct work_struct *work)
+ {
+ 	struct smb1351_charger *chip = container_of(work,
+ 			struct smb1351_charger, sw_rerun_aicl_work.work);
+-	int rc;
++	int rc = 0;
+ 	u8 aicl_result;
+ 	u8 input_current;
+ 
+@@ -1267,7 +1267,7 @@ static void smb1351_chg_hvdcp_det_work(struct work_struct *work)
+ {
+ 	struct smb1351_charger *chip = container_of(work,
+ 			struct smb1351_charger, chg_hvdcp_det_work.work);
+-	int rc;
++	int rc = 0;
+ 	int hvdcp_det_status = 0;
+ 	u8 hvdcp_status = 0, hvdcp_result = 0;
+ 	union power_supply_propval val;
+@@ -1471,7 +1471,7 @@ static int smblib_set_vbus_disable(struct smb1351_charger *chip,
+ 
+ static int smb1351_set_suspend_to_iic(struct charger_device *chg_dev, bool suspend)
+ {
+-	int rc;
++	int rc = 0;
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+ 	rc = smb1351_enable_volatile_writes(chip);
+ 	if (rc) {
+@@ -1510,7 +1510,7 @@ static irqreturn_t smb1351_chg_stat_handler(int irq, void *dev_id)
+ 	u8 triggered;
+ 	u8 changed;
+ 	u8 rt_stat, prev_rt_stat;
+-	int rc;
++	int rc = 0;
+ 	int handler_count = 0;
+ 	union power_supply_propval val;
+ 
+@@ -1594,7 +1594,7 @@ static irqreturn_t smb1351_chg_stat_handler(int irq, void *dev_id)
+ static int show_cnfg_regs(struct seq_file *m, void *data)
+ {
+ 	struct smb1351_charger *chip = m->private;
+-	int rc;
++	int rc = 0;
+ 	u8 reg;
+ 	u8 addr;
+ 
+@@ -1627,7 +1627,7 @@ static const struct file_operations cnfg_debugfs_ops = {
+ static int show_cmd_regs(struct seq_file *m, void *data)
+ {
+ 	struct smb1351_charger *chip = m->private;
+-	int rc;
++	int rc = 0;
+ 	u8 reg;
+ 	u8 addr;
+ 
+@@ -1660,7 +1660,7 @@ static const struct file_operations cmd_debugfs_ops = {
+ static int show_status_regs(struct seq_file *m, void *data)
+ {
+ 	struct smb1351_charger *chip = m->private;
+-	int rc;
++	int rc = 0;
+ 	u8 reg;
+ 	u8 addr;
+ 
+@@ -1727,7 +1727,7 @@ static const struct file_operations irq_count_debugfs_ops = {
+ static int get_reg(void *data, u64 *val)
+ {
+ 	struct smb1351_charger *chip = data;
+-	int rc;
++	int rc = 0;
+ 	u8 temp;
+ 
+ 	rc = smb1351_read_reg(chip, chip->peek_poke_address, &temp);
+@@ -1768,7 +1768,7 @@ DEFINE_SIMPLE_ATTRIBUTE(force_irq_ops, NULL, force_irq_set, "0x%02llx\n");
+ 
+ void dump_regs(struct smb1351_charger *chip)
+ {
+-	int rc;
++	int rc = 0;
+ 	u8 reg;
+ 	u8 addr;
+ 
+@@ -1929,7 +1929,7 @@ static int create_debugfs_entries(struct smb1351_charger *chip)
+ }
+ static int smb1351_get_voltage_now(struct smb1351_charger *chip, union power_supply_propval *val)
+ {
+-	int rc;
++	int rc = 0;
+ 	u8 reg;
+ 
+ 	if (chip->shutdown_status == true) {
+@@ -2042,7 +2042,7 @@ static int smb1351_parallel_set_property(struct power_supply *psy,
+ static int smb1351_parallel_is_writeable(struct power_supply *psy,
+ 				       enum power_supply_property prop)
+ {
+-	int rc;
++	int rc = 0;
+ 
+ 	switch (prop) {
+ 	case POWER_SUPPLY_PROP_VBUS_DISABLE:
+@@ -2277,7 +2277,7 @@ static int smb1351_set_usbchg_current(struct charger_device *chg_dev, u32 uA)
+ {
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+ 	int i, rc = 0;
+-	static prev_current = -1;
++	static int prev_current = -1;
+ 	u8 reg = 0, mask = 0;
+ 	u32 current_ma = uA / 1000;
+ 
+@@ -2463,7 +2463,7 @@ static int smb1351_plug_out(struct charger_device *chg_dev)
+ {
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+ //	struct charger_manager *cm = chip->chg_consumer->cm;
+-	int rc;
++	int rc = 0;
+ 	pr_err("%s \n", __func__);
+ 
+ 	chip->hvdcp_type = HVDCP_NULL;
+@@ -2489,7 +2489,7 @@ static int smb1351_plug_out(struct charger_device *chg_dev)
+ static int smb1351_plug_in(struct charger_device *chg_dev)
+ {
+ //	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+-//	int rc;
++//	int rc = 0;
+ 	pr_err("%s \n", __func__);
+ 	/* Enable SW conn therm Regulation */
+ 	// rc = smblib_set_sw_conn_therm_regulation(chip, true);
+@@ -2544,7 +2544,7 @@ static int smb1351_enable_hvdcp_det(struct charger_device *chg_dev, bool enable)
+ static int smb1351_set_hvdcp_dpdm(struct charger_device *chg_dev)
+ {
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+-	int rc;
++	int rc = 0;
+ 	int i;
+ 	u8 reg;
+ 	int vbus_diff, sub_count;
+@@ -2706,7 +2706,7 @@ static int smb1351_enable_otg(struct charger_device *chg_dev, bool en)
+ static int smb1351_set_otg_current(struct charger_device *chg_dev, u32 uA)
+ {
+ 	u8 reg;
+-	int rc;
++	int rc = 0;
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+ 	if (uA >= 1800000)
+ 		reg = 0x00;
+@@ -2724,7 +2724,7 @@ static int smb1351_set_otg_current(struct charger_device *chg_dev, u32 uA)
+ static int smb1351_get_charger_type(struct charger_device *chg_dev, u32 *type)
+ {
+ 	u8 reg;
+-	int rc;
++	int rc = 0;
+ 	struct smb1351_charger *chip = dev_get_drvdata(&chg_dev->dev);
+ 	rc = smb1351_read_reg(chip, 0x3A, &reg);
+ 	if (rc) {
+@@ -2904,7 +2904,7 @@ static struct charger_ops smb1351_chg_ops = {
+ 
+ static void smb1351_init_charger_input_range(struct smb1351_charger *chip)
+ {
+-	int rc;
++	int rc = 0;
+ 
+ 	rc = smb1351_enable_volatile_writes(chip);
+ 	if (rc) {
+@@ -2918,7 +2918,7 @@ static void smb1351_init_charger_input_range(struct smb1351_charger *chip)
+ 
+ static void smb1351_delay_init_work(struct work_struct *work)
+ {
+-	int rc;
++	int rc = 0;
+ 	struct power_supply_config parallel_psy_cfg = {};
+ 	struct smb1351_charger *chip = container_of(work,
+ 			struct smb1351_charger, delay_init_work.work);
+@@ -3080,7 +3080,7 @@ static void smb1351_delay_init_work(struct work_struct *work)
+ static int smb1351_charger_probe(struct i2c_client *client,
+ 			const struct i2c_device_id *id)
+ {
+-	int rc;
++	int rc = 0;
+ 	struct smb1351_charger *chip;
+ 
+ 	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
+@@ -3154,7 +3154,7 @@ static int smb1351_charger_probe(struct i2c_client *client,
+ static int smb1351_charger_remove(struct i2c_client *client)
+ {
+ 	struct smb1351_charger *chip = i2c_get_clientdata(client);
+-	int rc;
++	int rc = 0;
+ 
+ 	pr_info("%s: remove\n", __func__);
+ 
+@@ -3180,7 +3180,7 @@ static int smb1351_charger_remove(struct i2c_client *client)
+ static void smb1351_charger_shutdown(struct i2c_client *client)
+ {
+ 	struct smb1351_charger *chip = i2c_get_clientdata(client);
+-	int rc;
++	int rc = 0;
+ 
+ 	pr_info("%s: shutdown\n", __func__);
+ 	smb1351_enable_otg(chip->chg_dev, false);
+diff --git a/drivers/power/supply/mediatek/misc/Makefile b/drivers/power/supply/mediatek/misc/Makefile
+index ef1cb5013..173ccf539 100644
+--- a/drivers/power/supply/mediatek/misc/Makefile
++++ b/drivers/power/supply/mediatek/misc/Makefile
+@@ -13,10 +13,10 @@
+ 
+ 
+ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/pmic/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/pmic/include
+ 
+ 
+ obj-y += mtk_gauge_time_service.o
+diff --git a/drivers/scsi/aic7xxx/Makefile b/drivers/scsi/aic7xxx/Makefile
+index c15be2590..6f3c7e2e6 100644
+--- a/drivers/scsi/aic7xxx/Makefile
++++ b/drivers/scsi/aic7xxx/Makefile
+@@ -36,7 +36,7 @@ aic79xx-y					+= aic79xx_osm.o	\
+ 
+ ccflags-y += -Idrivers/scsi
+ ifdef WARNINGS_BECOME_ERRORS
+-ccflags-y += -Werror
++ccflags-y += 
+ endif
+ 
+ # Files generated that shall be removed upon make clean
+diff --git a/drivers/scsi/lpfc/Makefile b/drivers/scsi/lpfc/Makefile
+index cb6aa802c..e8aad0832 100644
+--- a/drivers/scsi/lpfc/Makefile
++++ b/drivers/scsi/lpfc/Makefile
+@@ -25,7 +25,7 @@ ccflags-$(GCOV) := -fprofile-arcs -ftest-coverage
+ ccflags-$(GCOV) += -O0
+ 
+ ifdef WARNINGS_BECOME_ERRORS
+-ccflags-y += -Werror
++ccflags-y += 
+ endif
+ 
+ obj-$(CONFIG_SCSI_LPFC) := lpfc.o
+diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
+index c68e80c4a..b5c0d155c 100644
+--- a/drivers/staging/android/ion/Makefile
++++ b/drivers/staging/android/ion/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_ION_OF) += ion_of.o
+ 
+ obj-$(CONFIG_MTK_ION) += mtk/
+ ccflags-$(CONFIG_MTK_ION)  += -I$(srctree)/drivers/staging/android/ion/mtk
++ccflags-y += -I$(srctree)/drivers/staging/android/ion
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmp/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+diff --git a/drivers/staging/fsl-mc/bus/dpio/Makefile b/drivers/staging/fsl-mc/bus/dpio/Makefile
+index 837d3303e..f33e41b47 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/Makefile
++++ b/drivers/staging/fsl-mc/bus/dpio/Makefile
+@@ -2,7 +2,7 @@
+ # QorIQ DPAA2 DPIO driver
+ #
+ 
+-subdir-ccflags-y := -Werror
++subdir-ccflags-y := 
+ 
+ obj-$(CONFIG_FSL_MC_DPIO) += fsl-mc-dpio.o
+ 
+diff --git a/drivers/watchdog/mediatek/Makefile b/drivers/watchdog/mediatek/Makefile
+index 090796c7a..38656a2a8 100644
+--- a/drivers/watchdog/mediatek/Makefile
++++ b/drivers/watchdog/mediatek/Makefile
+@@ -13,9 +13,9 @@
+ 
+ #$(call all-subdir-src-or-makefile)
+ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
+ 
+ obj-$(CONFIG_MTK_WATCHDOG)		+= wdk/
+ 
+diff --git a/drivers/watchdog/mediatek/wdk/Makefile b/drivers/watchdog/mediatek/wdk/Makefile
+index 95ae28550..5b7147046 100644
+--- a/drivers/watchdog/mediatek/wdk/Makefile
++++ b/drivers/watchdog/mediatek/wdk/Makefile
+@@ -13,7 +13,7 @@
+ 
+ ccflags-y += -I$(srctree)/drivers/watchdog/mediatek/include
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/masp/asfv2/asf_inc
+ 
+ obj-$(CONFIG_MTK_WD_KICKER) += wd_common_drv.o
+ obj-y += wd_api.o
+diff --git a/drivers/watchdog/mediatek/wdt/common/wdt_v2/Makefile b/drivers/watchdog/mediatek/wdt/common/wdt_v2/Makefile
+index 3055a622c..ea1e1d6c1 100644
+--- a/drivers/watchdog/mediatek/wdt/common/wdt_v2/Makefile
++++ b/drivers/watchdog/mediatek/wdt/common/wdt_v2/Makefile
+@@ -12,6 +12,7 @@
+ #
+ 
+ ccflags-y += -I$(srctree)/drivers/watchdog/mediatek/include
++ccflags-y += -I$(srctree)/drivers/watchdog/mediatek/wdt/common/wdt_v2
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/dbgtop
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include/mach
+ ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/koro/$(CONFIG_MTK_PLATFORM)/inc
+diff --git a/include/linux/soc/mediatek/mtk_sip_svc.h b/include/linux/soc/mediatek/mtk_sip_svc.h
+index 1c00a3ff5..bf943c594 100644
+--- a/include/linux/soc/mediatek/mtk_sip_svc.h
++++ b/include/linux/soc/mediatek/mtk_sip_svc.h
+@@ -3,8 +3,8 @@
+  * Copyright (c) 2019 MediaTek Inc.
+  */
+ 
+-#ifndef _MTK_SECURE_API_H_
+-#define _MTK_SECURE_API_H_
++#ifndef _MTK_SIP_SVC_H_
++#define _MTK_SIP_SVC_H_
+ 
+ #include <linux/kernel.h>
+ 
+@@ -51,4 +51,4 @@
+ 	(0x82000523 | MTK_SIP_SMC_AARCH_BIT)
+ 
+ #endif
+-/* _MTK_SECURE_API_H_ */
++/* _MTK_SIP_SVC_H_ */
+diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
+index 0fc39401b..bce47afd9 100644
+--- a/sound/soc/mediatek/Makefile
++++ b/sound/soc/mediatek/Makefile
+@@ -10,7 +10,7 @@
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+-subdir-ccflags-y += -Werror
++subdir-ccflags-y += 
+ 
+ #scp smartpa related code
+ obj-$(CONFIG_SND_SOC_MTK_SCP_SMARTPA) += scp_spk/
+@@ -44,8 +44,8 @@ MTK_CODEC := $(subst ",,$(CONFIG_MTK_SND_SOC_CODEC))
+ 
+ # PMIC include path
+ ifneq  ($(MTK_CODEC),)
+-subdir-ccflags-y += -Werror -Werror -Icodec/$(MTK_CODEC)/
+-subdir-ccflags-y += -Werror -I$(src)/common_int
++subdir-ccflags-y +=   -Icodec/$(MTK_CODEC)/
++subdir-ccflags-y +=  -I$(src)/common_int
+ 
+ # Update pmic built flow to avoid codec init later than codec probe
+ obj-y += codec/$(MTK_CODEC)/
+@@ -55,8 +55,8 @@ MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ # flags for not ready feature, uncomment after ready
+ subdir-ccflags-y += -D_GIT318_PMIC_READY
+ subdir-ccflags-y += -DAUDIO_USING_WRAP_DRIVER
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/
+ endif
+ endif
+ 
+@@ -91,16 +91,16 @@ subdir-ccflags-y += -D_MT_IDLE_HEADER
+ subdir-ccflags-y += -D_REG_SYNC_WRITE
+ 
+ # include path
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include
+-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6833/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/include
+-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/mt6833/
+-subdir-ccflags-${CONFIG_MACH_MT6833} += -Werror -I$(srctree)/drivers/misc/mediatek/dramc/mt6833/
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include
++subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt6833/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/include/mt-plat
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/base/power/include
++subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/base/power/mt6833/
++subdir-ccflags-${CONFIG_MACH_MT6833} +=  -I$(srctree)/drivers/misc/mediatek/dramc/mt6833/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)/
+ 
+ ifeq ($(CONFIG_MACH_MT6833),y)
+ AUDIO_PLATFORM := mt6833
+@@ -108,19 +108,19 @@ else
+ AUDIO_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ endif
+ 
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/scp/$(AUDIO_PLATFORM)/
+-subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/audio_ipi/$(AUDIO_PLATFORM)/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/scp/$(AUDIO_PLATFORM)/
++subdir-ccflags-y +=  -I$(srctree)/drivers/misc/mediatek/audio_ipi/$(AUDIO_PLATFORM)/
+ 
+ 
+ # Common include path
+-subdir-ccflags-y += -Werror -I$(src)/common_int
++subdir-ccflags-y +=  -I$(src)/common_int
+ 
+ # PMIC include path
+ ifneq  ($(MTK_CODEC),)
+-subdir-ccflags-y += -Werror -I$(src)/codec/$(MTK_CODEC)
++subdir-ccflags-y +=  -I$(src)/codec/$(MTK_CODEC)
+ endif
+ 
+-subdir-ccflags-y += -Werror -Wno-incompatible-pointer-types
++subdir-ccflags-y +=  -Wno-incompatible-pointer-types
+ 
+ # Update pmic built flow to avoid codec init later than codec probe
+ ifneq  ($(MTK_CODEC),)
+@@ -132,7 +132,7 @@ obj-y += common_int/
+ obj-y += $(AUDIO_PLATFORM)/
+ 
+ # AP include path
+-subdir-ccflags-y += -Werror -I$(src)/$(AUDIO_PLATFORM)
++subdir-ccflags-y +=  -I$(src)/$(AUDIO_PLATFORM)
+ endif
+ 
+ #for AWINIC AW87519 Smart K PA
+diff --git a/sound/soc/mediatek/mt6768/mt6768-misc-control.c b/sound/soc/mediatek/mt6768/mt6768-misc-control.c
+index d3ea7e5aa..9ace76413 100644
+--- a/sound/soc/mediatek/mt6768/mt6768-misc-control.c
++++ b/sound/soc/mediatek/mt6768/mt6768-misc-control.c
+@@ -37,7 +37,7 @@ static const char * const mt6768_sgen_mode_str[] = {
+ 	"I34I35",
+ };
+ 
+-static const int const mt6768_sgen_mode_idx[] = {
++static const int mt6768_sgen_mode_idx[] = {
+ 	0, 1, 2, 3,
+ 	4, 5, 6, 7,
+ 	8, 9, 10, 11,
+@@ -58,7 +58,7 @@ static const char * const mt6768_sgen_rate_str[] = {
+ 	"192k"
+ };
+ 
+-static const int const mt6768_sgen_rate_idx[] = {
++static const int mt6768_sgen_rate_idx[] = {
+ 	0, 1, 2, 4,
+ 	5, 6, 8, 9,
+ 	10, 11, 12, 13,
