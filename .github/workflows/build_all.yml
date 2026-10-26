@@ -95,7 +95,7 @@ jobs:
           cd ~/twrp
           git config --global user.name "Antigravity CI"
           git config --global user.email "ci@antigravity.local"
-          ~/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0
+          ~/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0-deprecated
           ~/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
 
       - name: Place Device Tree
