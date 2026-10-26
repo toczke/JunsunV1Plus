@@ -149,6 +149,22 @@ index b9e1108e5..4c5f8b750 100644
  endif
  
  obj-$(CONFIG_DRM_TILCDC_SLAVE_COMPAT) += tilcdc_slave_compat.o \
+diff --git a/drivers/gpu/drm/virtio/virtgpu_fb.c b/drivers/gpu/drm/virtio/virtgpu_fb.c
+index b717269e7..29147b4dd 100644
+--- a/drivers/gpu/drm/virtio/virtgpu_fb.c
++++ b/drivers/gpu/drm/virtio/virtgpu_fb.c
+@@ -246,6 +246,11 @@ static int virtio_gpufb_create(struct drm_fb_helper *helper,
+ 	if (ret)
+ 		goto err_obj_attach;
+ 
++	virtio_gpu_cmd_set_scanout(vgdev, 0, obj->hw_res_handle,
++				   parms.width, parms.height, 0, 0);
++	virtio_gpu_cmd_resource_flush(vgdev, obj->hw_res_handle,
++				      0, 0, parms.width, parms.height);
++
+ 	info = drm_fb_helper_alloc_fbi(helper);
+ 	if (IS_ERR(info)) {
+ 		ret = PTR_ERR(info);
 diff --git a/drivers/input/input.c b/drivers/input/input.c
 index f9f3d6261..328402062 100644
 --- a/drivers/input/input.c
