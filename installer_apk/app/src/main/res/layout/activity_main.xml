@@ -19,7 +19,7 @@
         android:id="@+id/tv_root_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Sprawdzanie luki ffsu..."
+        android:text="Checking root exploit (ffsu)..."
         android:textColor="#FFBB33"
         android:textSize="16sp"
         android:layout_marginTop="6dp" />
@@ -37,7 +37,7 @@
             android:layout_width="0dp"
             android:layout_height="65dp"
             android:layout_weight="1"
-            android:text="1. Kopia Recovery (Backup)"
+            android:text="1. Backup Recovery"
             android:textSize="14sp"
             android:layout_marginEnd="8dp" />
 
@@ -46,7 +46,7 @@
             android:layout_width="0dp"
             android:layout_height="65dp"
             android:layout_weight="1"
-            android:text="2. Wgraj TWRP (Flash)"
+            android:text="2. Flash TWRP"
             android:textSize="14sp"
             android:layout_marginEnd="8dp" />
 
@@ -55,7 +55,7 @@
             android:layout_width="0dp"
             android:layout_height="65dp"
             android:layout_weight="1"
-            android:text="3. Uruchom w TWRP"
+            android:text="3. Reboot to Recovery"
             android:textSize="14sp" />
     </LinearLayout>
 
@@ -64,7 +64,7 @@
         android:id="@+id/tv_file_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Wymagany plik: /sdcard/twrp.img lub z pendrive'a USB"
+        android:text="Required image file: /sdcard/twrp.img or from USB drive"
         android:textColor="#AAAAAA"
         android:textSize="13sp"
         android:layout_marginTop="12dp" />
@@ -85,7 +85,7 @@
             android:fontFamily="monospace"
             android:textColor="#00FF00"
             android:textSize="13sp"
-            android:text="[System gotowy do działania]\n" />
+            android:text="[System initialized and ready]\n" />
     </ScrollView>
 
 </LinearLayout>

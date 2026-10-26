@@ -1,14 +1,10 @@
 # Junsun V1 Plus / Topway TS8667 (MT8667 / MT6768) Automotive Headunit Knowledge Base
 
-Complete technical reverse-engineering documentation, hardware specifications, partition layouts, binary formats, pre-installed app audits, backdoors, root methods, and custom recovery (TWRP) porting guide for the **Junsun V1 Plus / Topway TS8667 / JunCan UI03** MediaTek MT8667 Android Car Headunit.
+Complete technical reverse-engineering documentation, hardware specifications, partition layouts, binary formats, pre-installed app audits, backdoors, root methods, custom recovery (TWRP) porting, and custom ROM development guide for the **Junsun V1 Plus / Topway TS8667 / JunCan UI03** MediaTek MT8667 Android Car Headunit.
 
 ---
 
 ## 📑 Documentation Index
-9. [Custom ROM Feasibility (Android 12 to 17)](docs/09_custom_rom_feasibility_analysis.md)
-   - Deep architectural audit: GKI, Linux 4.19 kernel, VNDK bridges, 16KB page size constraint.
-   - Preserving MCU serial, CAN bus, ROHM BD3702 DSP, Techpoint 360° AVM with DiPlay.
-   - 3 implementation paths and full step-by-step porting blueprint.
 
 1. [Hardware & Platform Architecture](docs/01_hardware_architecture.md)
    - SoC, Octa-Core big.LITTLE CPU details, GPU, memory, power management (MT6358).
@@ -59,14 +55,15 @@ Complete technical reverse-engineering documentation, hardware specifications, p
    - 3-phase implementation roadmap.
 
 9. [Custom ROM Feasibility & Android 12-17 Porting Analysis](docs/09_custom_rom_feasibility_analysis.md)
-   - Deep-dive into MediaTek MT8667/MT6768 BSP availability across Android 10, 11, 12, 13, 14+.
+   - Deep architectural audit: GKI, Linux 4.19 kernel, VNDK bridges, 16KB page size constraint.
+   - MediaTek MT8667/MT6768 BSP availability across Android 10, 11, 12, 13, 14+.
    - GSI (Generic System Image) vs. Vendor HAL porting breakdown.
-   - 1280x720 landscape automotive UI enforcement.
+   - Forced 1280x720 landscape automotive UI enforcement.
 
 10. [MainUI Decompilation & Stock Android Settings Integration](docs/10_mainui_decompilation_and_settings_integration.md)
    - Complete decompilation map of `classes.dex` and `classes2.dex`.
    - Comprehensive table of all secret developer codes (`8878`, `8888`, `1617`, `0129`, `4848`).
-   - Car Settings Bridge architecture (`car_settings_bridge/`) injecting "Ustawienia Samochodu" directly into AOSP Settings.
+   - Car Settings Bridge architecture (`car_settings_bridge/`) injecting "Car Settings" directly into AOSP Settings.
    - Hardware retention matrix: DVR (`com.ankai.cardvr`), TPMS, DVD player, and DUDU-OS launcher.
 
 ---
@@ -75,7 +72,7 @@ Complete technical reverse-engineering documentation, hardware specifications, p
 
 - **`twrp_device_tree/`**: Official TWRP 10.0 device tree configured in forced landscape (1280x720) with prebuilt kernel, dtb, and recovery_dtbo.
 - **`installer_apk/`**: One-click TWRP Installer Android App utilizing `/system/xbin/ffsu` for zero-PC recovery flashing and backup.
-- **`car_settings_bridge/`**: Native Android app injecting "Ustawienia Samochodu" (Car Settings) into stock Android Settings, providing passwordless direct access to reversing camera, SWC, CAN Bus, DSP, fan control, and factory menus.
+- **`car_settings_bridge/`**: Native Android app injecting "Car Settings" into stock Android Settings, providing passwordless direct access to reversing camera, SWC, CAN Bus, DSP, fan control, and factory menus.
 - **`tools/patch_firmware.py`**: Automated Python tool for inspecting, extracting, and splicing partitions into `8667.bin` with `8667.upd` MD5 regeneration.
 - **`tools/debloat_and_customize.sh`**: Shell script to prune Chinese telemetry, strip stock junk launchers, enforce DUDU-OS, and preserve vehicle hardware apps.
 - **`.github/workflows/build_all.yml`**: GitHub Actions automated pipeline to compile TWRP recovery, Flasher APK, and Car Settings Bridge.

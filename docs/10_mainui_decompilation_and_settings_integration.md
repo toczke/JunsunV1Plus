@@ -1,118 +1,120 @@
-# 10. Dekompilacja MainUI i Integracja Ustawień w Stock Android Settings
+# Chapter 10: MainUI Decompilation & Stock Android Settings Integration
 
-> **Status:** Analiza kompletna po pełnej dekompilacji `classes.dex` i `classes2.dex` oraz deasemblacji zasobów APKTool/JADX z `MainUI.apk` (wersja `V11.1.2_20231023`).
-
----
-
-## 1. Architektura `MainUI.apk`
-
-Wbrew nazwie, `MainUI.apk` to nie tylko launcher – to **centralny demon sprzętowy stacji multimedialnej Junsun V1 Plus / Topway TS10 / MT8667**. Zawiera:
-1. **Natywne biblioteki JNI:**
-   - `libts67xhw.so` (381 KB) – komunikacja UART z mikrokontrolerem MCU (`/dev/ttyMT1`), sterowanie zasilaniem, radiem analogowym, fizycznymi przyciskami i podświetleniem.
-   - `libcan59.so` (2.75 MB) – dekoder ramek CAN Bus dla ponad 80 marek samochodów (Raise, Hiworld, SimpleSoft, Bagoo itp.).
-   - `libpymatch.so` & `libts70xicfg.so` – logika krosowania sygnałów i konfiguracji interfejsu.
-2. **Kluczowe serwisy sprzętowe:**
-   - `com.ts.main.common.MainService` – główny demon nasłuchujący komunikatów z MCU i CAN.
-   - `com.ts.backcar.BackcarService` – automatyczne przełączanie ekranu na kamerę cofania po wykryciu biegu wstecznego (`REVERSE` pin / CAN frame).
-   - `com.ts.main.cpufan.CpuTempUtilsService` – monitoring termiczny i załączanie wentylatora chłodzenia CPU.
-3. **Ekrany konfiguracyjne (Activities):**
-   - Ekrany ustawień fabrycznych (`com.ts.factoryset.*`)
-   - Ekrany ustawień użytkownika i DSP (`com.ts.set.*`)
-   - Kalibracja przycisków kierownicy (`com.ts.main.CStudy.*`)
+> **Status:** Analysis complete following full JADX decompilation of `classes.dex`, `classes2.dex`, and APKTool resource extraction from `MainUI.apk` (firmware build `V11.1.2_20231023`).
 
 ---
 
-## 2. Mapa Ukrytych Kodów Fabrycznych i Działań
+## 1. Internal Architecture of `MainUI.apk`
 
-Podczas analizy kodu `com.ts.main.common.MainSet.DealFactorySec()` oraz zasobów `res/values/strings.xml` wyekstrahowano pełną listę kodów serwisowych:
+Contrary to its name, `MainUI.apk` is not merely a launcher or front-end interface—it serves as the **central hardware abstraction daemon and HAL bridge** for the Junsun V1 Plus / Topway TS8667 platform.
 
-| Kod | Nazwa stałej w kodzie | Wywoływana akcja / Klasa docelowa | Opis działania |
+### Core Architecture Layers:
+1. **Native JNI Shared Libraries (`lib/armeabi-v7a/`):**
+   - **`libts67xhw.so` (381 KB):** Handles low-level UART communication with the Microcontroller Unit (MCU) over `/dev/ttyMT1`. Manages analog tuner chips, power management states (sleep, ignition ACC), hardware audio volume registers, resistive touch button illumination, and camera switching.
+   - **`libcan59.so` (2.75 MB):** Massive protocol parser containing decoding engines for over 340 vehicle models and CAN box manufacturers (Raise, Hiworld, SimpleSoft, Bagoo, OUDI, Xinpu, etc.).
+   - **`libpymatch.so` & `libts70xicfg.so`:** Signal cross-routing and dynamic UI mapping.
+2. **Headless Background Services:**
+   - **`com.ts.main.common.MainService`:** Core background daemon listening on MCU serial and CAN bus pipelines.
+   - **`com.ts.backcar.BackcarService`:** Automatic video pipeline switcher that grabs the screen when reverse gear is engaged (`REVERSE` wire trigger or CAN frame).
+   - **`com.ts.main.cpufan.CpuTempUtilsService`:** Continuous thermal monitoring service controlling the active CPU cooling fan via MCU GPIO.
+3. **Hardware Configuration Activities:**
+   - Factory Engineering Menus (`com.ts.factoryset.*`)
+   - User Car Settings & DSP Audio Processor (`com.ts.set.*`)
+   - Steering Wheel Key Learning (`com.ts.main.CStudy.*`)
+
+---
+
+## 2. Master Secret Engineering Codes & Triggers
+
+Extracted directly from `com.ts.main.common.MainSet.DealFactorySec()` and `res/values/strings.xml`:
+
+| Dial Code | Internal Code Constant | Triggered Target / Activity Class | Functional Purpose |
 | :--- | :--- | :--- | :--- |
-| **`8878`** | `custom_fatctory_num` | `com.ts.factoryset.FsMainActivity` (`factory=true`) | **Główne pełne menu fabryczne** (bez ograniczeń) |
-| **`8888`** | `custom_shop_num` | `WinShow.GotoWin(15, 0)` | Szybkie menu instalatorskie / sklepowe |
-| **`7224`** | Hardcoded | `com.ts.factoryset.FsMainActivity` (`factory=true`) | Alternatywny kod dostępu do menu fabrycznego |
-| **`3368`** | Hardcoded | `com.ts.factoryset.FsMainActivity` | Hasło inżynieryjne TengShi / Topway |
-| **`1617`** | `custom_usbwait_id_num` | `com.ts.main.auth.FactoryMainActivity` | **Przełączenie portu USB w tryb ADB Device** |
-| **`4848`** | `custom_open_system_setting_num`| `com.android.settings` | Bezpośrednie otwarcie czystych ustawień Androida |
-| **`4949`** | `custom_open_filemange` | `com.ts.filemanager` | Otwarcie menedżera plików |
-| **`0129`** | `custom_can_data_num` | `startCanDataService()` | **Sniffer / Monitor surowych ramek CAN w czasie rzeczywistym** |
-| **`0127`** | `custom_can_keystudy_num`| `com.ts.can.CanCarInfoSub3Activity` | Zaawansowane uczenie przycisków cyfrowych z magistrali CAN |
-| **`0128`** | `custom_can_update_num` | `com.ts.can.CanAllUpdateActivity` | Aktualizacja oprogramowania układowego modułu CAN Box |
-| **`1414`** | `custom_reboot_id_num` | `PowerManager.reboot()` | Natychmiastowy restart stacji |
-| **`1313`** | `custom_radio_reset_num`| `FtSet.ResetRadio()` | Reset układu scalonego tunera radiowego AM/FM |
-| **`123`** | `custom_check_dsp_secret`| `Iop.GetDspVer()` | Wyświetlenie dokładnej wersji procesora DSP |
-| **`1101`** | `custom_screenshot_num` | Toggle screenshot trigger | Włączenie/wyłączenie trybu zrzutów ekranu |
-| **`1102`** | `custom_touchtest_num` | `com.ts.touchcheck` | Tryb kalibracji i testu wielodotyku panelu |
-| **`1103`** | `custom_screen_adjust_num`| `com.ts.screentest.MainActivity` | Kalibracja parametrów matrycy LCD / LVDS |
-| **`6666`** | `custom_fatctory_exprort_num`| `com.ts.factoryset.FsMPModeActivity` | Eksport / Import profilu fabrycznego na USB |
-| **`2648`** | `custom_systemclear_pwd`| `MainSet.SystemClear()` | Pełny reset fabryczny stacji |
-| **`9090`** / **`9191`** | `custom_destroy_id_*` | Usunięcie licencji / certyfikatów autoryzacji | Niszczenie kluczy aktywacyjnych producenta |
-| **`1314214`** | Sekwencja dotknięć | `SettingEquipmentActivity` -> `FsMainActivity` | Ukryty backdoor dotykowy w ekranie "O urządzeniu" |
+| **`8878`** | `custom_fatctory_num` | `com.ts.factoryset.FsMainActivity` (`factory=true`) | **Full Unrestricted Factory Settings Menu** |
+| **`8888`** | `custom_shop_num` | `WinShow.GotoWin(15, 0)` | Quick Installer / Shop Menu |
+| **`7224`** | Hardcoded | `com.ts.factoryset.FsMainActivity` (`factory=true`) | Alternative direct factory menu entry |
+| **`3368`** | Hardcoded | `com.ts.factoryset.FsMainActivity` | TengShi / Topway engineering access password |
+| **`1617`** | `custom_usbwait_id_num` | `com.ts.main.auth.FactoryMainActivity` | **Switches USB port to ADB Device Mode** |
+| **`4848`** | `custom_open_system_setting_num`| `com.android.settings` | Direct shortcut to Stock Android Settings |
+| **`4949`** | `custom_open_filemange` | `com.ts.filemanager` | Direct shortcut to Stock File Manager |
+| **`0129`** | `custom_can_data_num` | `startCanDataService()` | **Real-time CAN Bus Raw Frame Sniffer / Monitor** |
+| **`0127`** | `custom_can_keystudy_num`| `com.ts.can.CanCarInfoSub3Activity` | Digital CAN bus steering wheel button mapper |
+| **`0128`** | `custom_can_update_num` | `com.ts.can.CanAllUpdateActivity` | CAN Bus decoder box firmware flashing tool |
+| **`1414`** | `custom_reboot_id_num` | `PowerManager.reboot()` | Immediate soft reboot of headunit |
+| **`1313`** | `custom_radio_reset_num`| `FtSet.ResetRadio()` | Hardware reset of AM/FM silicon tuner chip |
+| **`123`** | `custom_check_dsp_secret`| `Iop.GetDspVer()` | Displays hardware DSP chip firmware version |
+| **`1101`** | `custom_screenshot_num` | Screen mode toggle | Toggles system screenshot capture mode |
+| **`1102`** | `custom_touchtest_num` | `com.ts.touchcheck` | Multi-touch coordinate accuracy & calibration test |
+| **`1103`** | `custom_screen_adjust_num`| `com.ts.screentest.MainActivity` | LCD / LVDS panel display timing calibration |
+| **`6666`** | `custom_fatctory_exprort_num`| `com.ts.factoryset.FsMPModeActivity` | Export / Import factory configuration to USB storage |
+| **`2648`** | `custom_systemclear_pwd`| `MainSet.SystemClear()` | Master password to initiate full factory data wipe |
+| **`9090`** / **`9191`** | `custom_destroy_id_*` | Activation certificate revoke | Revokes vendor hardware activation certificates |
+| **`1314214`** | Multi-tap touch sequence | `SettingEquipmentActivity` -> `FsMainActivity` | Hidden multi-tap Easter egg on "About" screen |
 
 ---
 
-## 3. Kluczowe Ekrany Ustawień Auta i Parametry
+## 3. Key Hardware Control Screens & APIs
 
-Wszystkie parametry konfiguracyjne pojazdu są zapisywane do pamięci mikrokontrolera lub partycji NVRAM za pośrednictwem natywnych wywołań klasy `com.yyw.ts70xhw.FtSet`:
+All vehicle settings write directly to MCU non-volatile registers or NVRAM partitions via static JNI bindings in `com.yyw.ts70xhw.FtSet`:
 
-### A. Kamera Cofania i Parkowanie (`com.ts.factoryset.FsBackCarSetActivity`)
-- **Format sygnału wideo (`FtSet.SetCamSUBfmt`):**
-  - `1`: CVBS NTSC
+### A. Reversing Camera & Parking Guidelines (`com.ts.factoryset.FsBackCarSetActivity`)
+- **Video Input Format (`FtSet.SetCamSUBfmt`):**
+  - `1`: CVBS NTSC (Standard Definition)
   - `2`: CVBS PAL
-  - `3`: AHD 720P 25fps
-  - `4`: AHD 720P 30fps
-  - `5`: AHD 1080P 25fps
-  - `6`: AHD 1080P 30fps
+  - `3`: AHD 720P @ 25fps
+  - `4`: AHD 720P @ 30fps
+  - `5`: AHD 1080P @ 25fps (High Definition)
+  - `6`: AHD 1080P @ 30fps
   - `7`: TVI 720P / 1080P
-- **Linie pomocnicze (`FtSet.SetLineType`, `FtSet.SetLinePos`):** statyczne, dynamiczne (skrętne z czujnika kąta kierownicy CAN) lub wyłączone.
-- **Wyciszanie audio przy cofaniu (`FtSet.SetParkMuteDef`):** 0 = bez wyciszenia, 1 = -10dB, 2 = wyciszenie całkowite.
-- **Lustro kamery przedniej / tylnej (`FtSet.SetCamMir`, `FtSet.SetFcamMir`):** odbicie lustrzane obrazu w poziomie.
+- **Parking Guidelines (`FtSet.SetLineType`, `FtSet.SetLinePos`):** Static guides, dynamic trajectory curves (steered via CAN steering angle sensor), or disabled.
+- **Reverse Audio Mute (`FtSet.SetParkMuteDef`):** `0` = No attenuation, `1` = -10dB attenuation, `2` = Full audio mute when reverse gear is active.
+- **Camera Mirroring (`FtSet.SetCamMir`, `FtSet.SetFcamMir`):** Horizontal flip for front and rear video feeds.
 
-### B. Sterowanie z Kierownicy – SWC (`com.ts.main.CStudy.CStudyMainActivity`)
-- Uczenie klawiszy rezystancyjnych (KEY1 / KEY2) podłączonych bezpośrednio do wiązki ISO.
-- Obsługuje 32 komendy: `GŁOŚNOŚĆ +`, `GŁOŚNOŚĆ -`, `MUTE`, `NASTĘPNY`, `POPRZEDNI`, `ODBIERZ`, `ODRZUĆ`, `NAWIGACJA`, `MODE`, `HOME`, `GŁOS / ASYSTENT`.
+### B. Steering Wheel Controls – SWC (`com.ts.main.CStudy.CStudyMainActivity`)
+- Calibrates analog resistive voltage ladders connected to KEY1 / KEY2 ISO wires.
+- Maps up to 32 discrete key codes: `VOLUME_UP`, `VOLUME_DOWN`, `MUTE`, `NEXT`, `PREV`, `CALL_ANSWER`, `CALL_END`, `NAVI`, `MODE`, `HOME`, `VOICE_ASSIST`.
 
-### C. Magistrala CAN Bus (`com.ts.factoryset.FsCanActivity`)
-- Konfiguracja producenta modułu CAN (SimpleSoft, Raise, Hiworld, Bagoo, OUDI, Xinpu itp.).
-- Wybór marki, modelu oraz rocznika samochodu.
-- Ustawienia wyświetlania stanu klimatyzacji (Climatronic overlay), czujników parkowania (PDC radar) oraz otwarcia drzwi.
+### C. CAN Bus Vehicle Protocol (`com.ts.factoryset.FsCanActivity`)
+- CAN box manufacturer selection (Raise, Hiworld, SimpleSoft, Bagoo, OUDI, Xinpu, etc.).
+- Vehicle brand, model, and year selection.
+- Features toggles: Climatronic AC overlay, PDC parking radar overlay, door/trunk open visualizer.
 
-### D. Procesor Dźwięku DSP (`com.ts.set.dsp.SetDspMainActivity`)
-- 32-pasmowy korektor graficzny (EQ) z niezależną regulacją częstotliwości i dobroci Q.
-- Pole dźwiękowe i opóźnienia czasowe (Time Alignment / Emperor Delay) w milisekundach/centymetrach dla każdego głośnika.
-- Filtr dolnoprzepustowy (LPF) i górnoprzepustowy (HPF) dla subwoofera.
-- Wzmocnienie dynamiki basu (Smart Bass Boost).
+### D. Digital Signal Processor – DSP (`com.ts.set.dsp.SetDspMainActivity`)
+- 32-band parametric/graphic equalizer with independent Q-factor adjustments.
+- Time Alignment / Emperor Delay (millisecond speaker delay compensation for driver-centric soundstage).
+- Subwoofer LPF (Low-Pass Filter) and HPF (High-Pass Filter) cutoff slopes.
+- Smart Bass Dynamic Boost.
 
-### E. Chłodzenie i Wentylator CPU (`com.ts.main.cpufan.ElectricFanActivity`)
-- Próg załączania wentylatora chłodzenia CPU: od 60°C do 80°C (rekomendowane: 60°C).
-- Tryb pracy: automatyczny wg temperatury (`FtSet.SetFanEn`) lub manualny test.
+### E. Active Cooling Fan Control (`com.ts.main.cpufan.ElectricFanActivity`)
+- Threshold temperature adjustment: 60°C to 80°C (recommended: 60°C).
+- Operational mode: Automatic thermal-trip control (`FtSet.SetFanEn`) or manual continuous operation.
 
 ---
 
-## 4. Koncepcja Integracji w Czyste Ustawienia Androida (AOSP Settings)
+## 4. Native AOSP Settings Integration Architecture
 
-Zamiast zmuszać użytkownika do szukania ukrytych aplikacji czy wpisywania kodów 8878/8888, integrujemy dedykowaną sekcję **"Ustawienia Samochodu"** bezpośrednio w główny interfejs Android Settings (`com.android.settings`).
+Rather than requiring users to search for hidden vendor APKs or dial secret codes like `8878`/`8888`, we integrate a dedicated **"Car Settings"** category directly into the Stock Android Settings app (`com.android.settings`).
 
-### Architektura Rozwiązania: `CarSettingsBridge`
-Wykorzystujemy natywny dla Androida mechanizm **Dynamic Dashboard Category** (`com.android.settings.category.ia.homepage`).
+### Implementation: `CarSettingsBridge`
+Leverages the standard AOSP **Dynamic Dashboard Category** mechanism (`com.android.settings.category.ia.homepage`).
 
 ```
                     ┌──────────────────────────────────────────────┐
                     │          Stock AOSP Settings.apk             │
-                    │       (Główne Ustawienia Androida)           │
+                    │         (Android System Settings)            │
                     └──────────────────────┬───────────────────────┘
                                            │ Dynamic Tile Injection
                                            ▼
              ┌───────────────────────────────────────────────────────────┐
-             │       "Ustawienia Samochodu" (Car Settings)               │
+             │            "Car Settings" Dashboard Tile                  │
              │           com.topway.carsettingsbridge                    │
              └─────────────────────────────┬─────────────────────────────┘
                                            │
          ┌───────────────────┬─────────────┴───────┬─────────────────────┐
          ▼                   ▼                     ▼                     ▼
 ┌─────────────────┐ ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│ Kamera Cofania  │ │ Przyciski Kier. │  │ Procesor DSP     │  │ Konfiguracja CAN │
-│  & Parkowanie   │ │  (SWC Learning) │  │  (32-Band EQ)    │  │  (Protokół/Auto) │
+│ Reversing Camera│ │ Steering Wheel  │  │ DSP Equalizer    │  │ CAN Bus Protocol │
+│  & Guidelines   │ │  (SWC Learning) │  │  (32-Band Audio) │  │  & Car Model     │
 │FsBackCarSetAct. │ │CStudyMainAct.   │  │SetDspMainActivity│  │  FsCanActivity   │
 └─────────────────┘ └─────────────────┘  └──────────────────┘  └──────────────────┘
          │                   │                     │                     │
@@ -120,17 +122,16 @@ Wykorzystujemy natywny dla Androida mechanizm **Dynamic Dashboard Category** (`c
                                            ▼
                              ┌───────────────────────────┐
                              │        libts67xhw.so      │
-                             │  Mikrokontroler MCU (UART)│
+                             │  Microcontroller (UART)   │
                              └───────────────────────────┘
 ```
 
-### Kod manifestu mostka (`CarSettingsBridge`):
+### Tile Declaration (`AndroidManifest.xml`):
 ```xml
 <activity
     android:name=".CarSettingsMainActivity"
     android:icon="@drawable/ic_car_settings"
     android:label="@string/car_settings_title"
-    android:theme="@style/Theme.SubSettings"
     android:exported="true">
     <intent-filter>
         <action android:name="com.android.settings.action.SETTINGS_EXTENDED" />
@@ -154,29 +155,27 @@ Wykorzystujemy natywny dla Androida mechanizm **Dynamic Dashboard Category** (`c
 </activity>
 ```
 
-Gdy użytkownik otworzy **Ustawienia**, kafelek **Ustawienia Samochodu** pojawia się bezpośrednio pod ustawieniami Sieci i Wyświetlacza. Po kliknięciu otrzymuje czytelne podmenu z kafelkami:
-1. **Kamera cofania i parkowanie** -> Otwiera bezpośrednio `com.ts.factoryset.FsBackCarSetActivity`.
-2. **Przyciski kierownicy (SWC)** -> Otwiera `com.ts.main.CStudy.CStudyMainActivity`.
-3. **Konfiguracja magistrali CAN Bus** -> Otwiera `com.ts.factoryset.FsCanActivity`.
-4. **Korektor dźwięku & Procesor DSP** -> Otwiera `com.ts.set.dsp.SetDspMainActivity`.
-5. **Podświetlenie przycisków RGB** -> Otwiera `com.ts.set.SetColorKeyMainActivity`.
-6. **Wentylator procesora** -> Otwiera `com.ts.main.cpufan.ElectricFanActivity`.
-7. **Zaawansowane menu fabryczne** -> Otwiera `com.ts.factoryset.FsMainActivity` z flagą `factory=true` (bez pytania o kod PIN!).
+When opened, the user sees structured preferences that launch directly into:
+1. **Camera & Parking** -> Directly invokes `com.ts.factoryset.FsBackCarSetActivity`.
+2. **Steering Wheel Controls** -> Directly invokes `com.ts.main.CStudy.CStudyMainActivity`.
+3. **CAN Bus & Vehicle** -> Directly invokes `com.ts.factoryset.FsCanActivity`.
+4. **DSP & Equalizer** -> Directly invokes `com.ts.set.dsp.SetDspMainActivity`.
+5. **RGB Touch Key Lighting** -> Directly invokes `com.ts.set.SetColorKeyMainActivity`.
+6. **Active CPU Cooling Fan** -> Directly invokes `com.ts.main.cpufan.ElectricFanActivity`.
+7. **Factory Engineering Menu** -> Directly invokes `com.ts.factoryset.FsMainActivity` with `factory=true` (bypasses PIN dialog completely!).
 
 ---
 
-## 5. Matryca Retencji i Odchudzania Aplikacji (De-bloat Matrix)
+## 5. App Retention & De-bloat Strategy
 
-Zgodnie z wymaganiami projektu budujemy ultralekki, responsywny system z zachowaniem kluczowych peryferiów:
-
-| Komponent / Aplikacja | Pakiet / Ścieżka | Decyzja | Uzasadnienie |
+| Component / Package | File Path | Decision | Technical Justification |
 | :--- | :--- | :--- | :--- |
-| **DUDU-OS Launcher** | `com.autonavi.dudu` | **DODAJ (Domyślny)** | Nowoczesny, stabilny ekran główny w landscape 1280x720 z integracją map i widgetów. |
-| **Wideorejestrator (DVR)** | `com.ankai.cardvr` (`CarDVR.apk`) | **ZACHOWAJ** | Obsługa przedniej kamery USB/MIPI rejestratora jazdy Ankai. |
-| **Czujniki ciśnienia (TPMS)**| `com.ts.main.tpms` / `MainUI.apk` | **ZACHOWAJ** | Monitoring ciśnienia i temperatury opon (zarówno USB TPMS jak i CAN TPMS). |
-| **Odtwarzacz DVD USB** | `DvdBox.apk` (`/vendor/app/DvdBox/`) | **ZACHOWAJ** | Obsługa zewnętrznego napędu DVD USB. |
-| **Google Mobile Services** | GMS Core, Chrome, Maps, YT | **ODCHUDŹ / OPCJA** | Zastąpienie fabrycznego bloatware przez **MicroG** (zalecane: ~30MB RAM) lub opcjonalną paczkę **NikGapps Core** (tylko Play Store + Play Services) do wyboru przez TWRP. |
-| **Stock CarPlay / Android Auto**| `sd_carplay`, `CarLetter`, `EasyConnect`| **USUŃ** | Przestarzałe, chińskie rozwiązania powodujące konflikty. Użytkownik instaluje nowoczesny **DiPlay** lub AutoKit. |
-| **Stock Launchery Juncani** | `8259TsLauncher2_*` (`/vendor/tsoem/`) | **USUŃ** | Zastąpione w 100% przez DUDU-OS Launcher. |
-| **Telemetria i Chińskie Usługi**| `txz`, `cpe_agent`, `cservice`, `ximalaya` | **USUŃ** | Naruszenie prywatności, obciążenie CPU, zbędne procesy w tle. |
-| **MainUI (Headless Hardware Daemon)**| `MainUI.apk` | **ZACHOWAJ / PRZEKROUJ** | Usunięto zbędne odtwarzacze wideo/muzyki, pozostawiono serwis sprzętowy MCU, CAN i aktywności konfiguracyjne. |
+| **DUDU-OS Launcher** | `com.autonavi.dudu` | **ADD (Default)** | High-performance, modern automotive UI in landscape 1280×720 with widget and split-screen map support. |
+| **Dashcam / Car DVR** | `com.ankai.cardvr` (`CarDVR.apk`) | **RETAIN** | Front collision USB/MIPI video recording stack. |
+| **Tire Pressure (TPMS)** | `com.ts.main.tpms` / `MainUI.apk` | **RETAIN** | Reads real-time tire pressure and temperature from USB sensors and CAN bus. |
+| **USB DVD-ROM Player** | `DvdBox.apk` (`/vendor/app/DvdBox/`) | **RETAIN** | Support for external USB optical drives. |
+| **Google Mobile Services** | GMS Core, Chrome, Maps, YouTube | **DEBLOAT / OPTION** | Replaced with **MicroG** (~30MB RAM overhead vs ~600MB stock GMS) or optional **NikGapps Core** via TWRP. |
+| **Stock CarPlay / Android Auto** | `sd_carplay`, `CarLetter`, `EasyConnect` | **REMOVE** | Outdated Chinese phone link services causing resource contention. Prepared for clean **DiPlay** / AutoKit deployment. |
+| **Stock OEM Launchers** | `8259TsLauncher2_*` (`/vendor/tsoem/`) | **REMOVE** | Cluttered 3D themes replaced completely by DUDU-OS. |
+| **Chinese Telemetry & Daemons** | `txz`, `cpe_agent`, `cservice`, `ximalaya` | **REMOVE** | Privacy violations, unnecessary background battery and CPU consumption. |
+| **MainUI (Headless Daemon)** | `MainUI.apk` | **RETAIN / STRIP** | Media player UIs stripped; MCU UART, CAN bus stack, and settings activities preserved. |

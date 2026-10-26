@@ -66,7 +66,7 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             File ffsu = new File(FFSU_BIN);
             if (ffsu.exists()) {
-                log("Znaleziono wbudowany binarny backdoor: " + FFSU_BIN);
+                log("Found built-in vendor backdoor binary: " + FFSU_BIN);
             }
 
             // Test executing root command via ffsu
@@ -74,24 +74,24 @@ public class MainActivity extends Activity {
             if (result.contains("uid=0")) {
                 isRootAvailable = true;
                 mainHandler.post(() -> {
-                    tvRootStatus.setText("Luka aktywna! Posiadasz pełne uprawnienia ROOT (uid=0)");
+                    tvRootStatus.setText("Root exploit active! Full root permissions acquired (uid=0)");
                     tvRootStatus.setTextColor(0xFF00FF00); // Green
                 });
-                log("Test uprawnień: " + result.trim());
+                log("Root permission verified: " + result.trim());
             } else {
                 isRootAvailable = false;
                 mainHandler.post(() -> {
-                    tvRootStatus.setText("Ostrzeżenie: ffsu nie zwrócił roota. Sprawdź adb.");
+                    tvRootStatus.setText("Warning: ffsu did not return root. Verify ADB root permissions.");
                     tvRootStatus.setTextColor(0xFFFF4444); // Red
                 });
-                log("Błąd roota: " + result.trim());
+                log("Root elevation failed: " + result.trim());
             }
         }).start();
     }
 
     private void runBackupRecovery() {
         new Thread(() -> {
-            log("Rozpoczynanie kopii zapasowej fabrycznego recovery...");
+            log("Starting stock recovery partition backup...");
             File outDir = new File(Environment.getExternalStorageDirectory(), "RecoveryBackup");
             if (!outDir.exists()) outDir.mkdirs();
 
@@ -101,22 +101,22 @@ public class MainActivity extends Activity {
             String cmd = String.format("dd if=%s of=%s bs=1048576 && chmod 666 %s",
                     RECOVERY_DEV, outFile.getAbsolutePath(), outFile.getAbsolutePath());
 
-            log("Wykonywanie: " + cmd);
+            log("Executing command: " + cmd);
             String res = executeRootCommand(cmd);
             log(res);
 
             if (outFile.exists() && outFile.length() > 10 * 1024 * 1024) {
-                log("SUKCES! Zapisano fabryczny recovery (" + (outFile.length() / 1024 / 1024) + " MB) do:");
+                log("SUCCESS! Saved stock recovery backup (" + (outFile.length() / 1024 / 1024) + " MB) to:");
                 log(outFile.getAbsolutePath());
             } else {
-                log("BŁĄD: Kopia nie powiodła się!");
+                log("ERROR: Recovery backup failed!");
             }
         }).start();
     }
 
     private void runFlashTwrp() {
         new Thread(() -> {
-            log("Szukanie pliku TWRP...");
+            log("Scanning for TWRP image file...");
             // Search standard paths on internal storage and USB drives
             File[] candidatePaths = new File[]{
                     new File(Environment.getExternalStorageDirectory(), "twrp.img"),
@@ -135,29 +135,29 @@ public class MainActivity extends Activity {
             }
 
             if (targetTwrp == null) {
-                log("BŁĄD: Nie znaleziono pliku twrp.img!");
-                log("Wrzuć plik 'twrp.img' bezpośrednio do pamięci urządzenia (/sdcard/twrp.img) lub na pendrive!");
+                log("ERROR: twrp.img not found!");
+                log("Place 'twrp.img' in root storage (/sdcard/twrp.img) or on a connected USB flash drive!");
                 return;
             }
 
-            log("Znaleziono obraz TWRP: " + targetTwrp.getAbsolutePath() + " (" + (targetTwrp.length() / 1024 / 1024) + " MB)");
-            log("Fleszowanie do partycji: " + RECOVERY_DEV);
+            log("Found TWRP recovery image: " + targetTwrp.getAbsolutePath() + " (" + (targetTwrp.length() / 1024 / 1024) + " MB)");
+            log("Flashing to recovery block device: " + RECOVERY_DEV);
 
             String cmd = String.format("dd if=%s of=%s bs=1048576", targetTwrp.getAbsolutePath(), RECOVERY_DEV);
             String res = executeRootCommand(cmd);
             log(res);
 
-            log("Wymuszanie zapisu na nośnik (sync)...");
+            log("Flushing disk cache (sync)...");
             executeRootCommand("sync");
 
-            log("GRATULACJE! TWRP zostało pomyślnie wgrane do partycji recovery!");
-            log("Możesz teraz kliknąć przycisk 3, aby uruchomić TWRP.");
+            log("SUCCESS! TWRP image has been flashed to recovery partition!");
+            log("You can now click Button 3 to reboot directly into TWRP.");
         }).start();
     }
 
     private void runRebootRecovery() {
         new Thread(() -> {
-            log("Uruchamianie urządzenia w trybie Recovery (TWRP)...");
+            log("Rebooting device into Recovery mode (TWRP)...");
             executeRootCommand("reboot recovery");
         }).start();
     }
@@ -190,7 +190,7 @@ public class MainActivity extends Activity {
             }
             process.waitFor();
         } catch (Exception e) {
-            output.append("Wyjątek: ").append(e.getMessage());
+            output.append("Exception: ").append(e.getMessage());
         }
         return output.toString();
     }
