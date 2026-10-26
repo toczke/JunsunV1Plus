@@ -6,11 +6,12 @@ on:
     paths:
       - 'twrp_device_tree/**'
       - 'installer_apk/**'
+      - 'car_settings_bridge/**'
       - '.github/workflows/build_all.yml'
 
 jobs:
   build_apk:
-    name: Build Flasher APK
+    name: Build Flasher & Settings APKs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -25,9 +26,15 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Build APK with Gradle
+      - name: Build Installer APK with Gradle
         run: |
           cd installer_apk
+          gradle wrapper --gradle-version 7.6
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Build Car Settings Bridge APK with Gradle
+        run: |
+          cd car_settings_bridge
           gradle wrapper --gradle-version 7.6
           ./gradlew assembleDebug --stacktrace
 
@@ -36,6 +43,12 @@ jobs:
         with:
           name: TS8667_TWRP_Flasher_APK
           path: installer_apk/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload Car Settings Bridge APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TS8667_Car_Settings_Bridge_APK
+          path: car_settings_bridge/build/outputs/apk/debug/car_settings_bridge-debug.apk
 
   build_twrp:
     name: Build TWRP Recovery Image

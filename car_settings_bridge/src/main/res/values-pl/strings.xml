@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name">Mostek Ustawień Samochodu</string>
+    <string name="car_settings_title">Ustawienia Samochodu</string>
+    <string name="car_settings_summary">Kamera cofania, przyciski kierownicy, procesor DSP, CAN bus, chłodzenie</string>
+
+    <!-- Kategoria: Kamera i Parkowanie -->
+    <string name="category_camera_parking">Kamera &amp; Parkowanie</string>
+    <string name="pref_camera_title">Konfiguracja Kamery Cofania</string>
+    <string name="pref_camera_summary">Format AHD (720p/1080p, TVI, CVBS), linie skrętne, radar, odbicie lustrzane</string>
+
+    <!-- Kategoria: Przyciski kierownicy -->
+    <string name="category_steering_wheel">Sterowanie z Kierownicy</string>
+    <string name="pref_swc_title">Uczenie Przycisków Kierownicy (SWC)</string>
+    <string name="pref_swc_summary">Kalibracja analogowych klawiszy rezystancyjnych (KEY1 / KEY2)</string>
+
+    <!-- Kategoria: CAN Bus -->
+    <string name="category_canbus">Magistrala CAN Bus &amp; Samochód</string>
+    <string name="pref_can_title">Moduł CAN Box &amp; Model Pojazdu</string>
+    <string name="pref_can_summary">Wybór protokołu (Raise, Hiworld itp.), marki, modelu i klimatyzacji</string>
+
+    <!-- Kategoria: Dźwięk & DSP -->
+    <string name="category_audio_dsp">Dźwięk &amp; Procesor DSP</string>
+    <string name="pref_dsp_title">Cyfrowy Procesor Dźwięku (DSP)</string>
+    <string name="pref_dsp_summary">Korektor 32-pasmowy, pole dźwiękowe, opóźnienia czasowe, filtr subwoofera</string>
+
+    <!-- Kategoria: Sprzęt & Chłodzenie -->
+    <string name="category_hardware_fan">Sprzęt &amp; Chłodzenie</string>
+    <string name="pref_fan_title">Wentylator Chłodzenia CPU</string>
+    <string name="pref_fan_summary">Ustawianie progów temperatur (60°C–80°C) i test wentylatora</string>
+    <string name="pref_colorkey_title">Podświetlenie Przycisków RGB</string>
+    <string name="pref_colorkey_summary">Dostosowanie koloru i trybu podświetlenia panelu dotykowego</string>
+
+    <!-- Kategoria: Menu fabryczne -->
+    <string name="category_factory">Ustawienia Zaawansowane</string>
+    <string name="pref_factory_title">Menu Fabryczne (Bez Hasła)</string>
+    <string name="pref_factory_summary">Pełny dostęp inżynieryjny (tuner radiowy, parametry matrycy, krosowanie)</string>
+
+    <!-- Kategoria: Aplikacje pokładowe -->
+    <string name="category_external_apps">Aplikacje Pokładowe Pojazdu</string>
+    <string name="pref_dvr_title">Wideorejestrator Trasy (DVR)</string>
+    <string name="pref_dvr_summary">Przednia kamera USB/MIPI (com.ankai.cardvr)</string>
+    <string name="pref_tpms_title">Czujniki Ciśnienia Opon (TPMS)</string>
+    <string name="pref_tpms_summary">Odczyt ciśnienia i temperatury w oponach</string>
+    <string name="pref_dvd_title">Odtwarzacz DVD USB</string>
+    <string name="pref_dvd_summary">Odtwarzanie płyt z zewnętrznego napędu DVD</string>
+
+    <string name="toast_launch_failed">Nie udało się uruchomić wybranego modułu: %s</string>
+</resources>

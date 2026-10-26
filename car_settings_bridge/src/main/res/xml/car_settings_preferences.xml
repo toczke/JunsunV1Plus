@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/category_camera_parking"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_camera"
+            android:title="@string/pref_camera_title"
+            android:summary="@string/pref_camera_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_steering_wheel"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_swc"
+            android:title="@string/pref_swc_title"
+            android:summary="@string/pref_swc_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_canbus"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_can"
+            android:title="@string/pref_can_title"
+            android:summary="@string/pref_can_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_audio_dsp"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_dsp"
+            android:title="@string/pref_dsp_title"
+            android:summary="@string/pref_dsp_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_hardware_fan"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_fan"
+            android:title="@string/pref_fan_title"
+            android:summary="@string/pref_fan_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="pref_colorkey"
+            android:title="@string/pref_colorkey_title"
+            android:summary="@string/pref_colorkey_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_factory"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_factory"
+            android:title="@string/pref_factory_title"
+            android:summary="@string/pref_factory_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/category_external_apps"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="pref_dvr"
+            android:title="@string/pref_dvr_title"
+            android:summary="@string/pref_dvr_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="pref_tpms"
+            android:title="@string/pref_tpms_title"
+            android:summary="@string/pref_tpms_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="pref_dvd"
+            android:title="@string/pref_dvd_title"
+            android:summary="@string/pref_dvd_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

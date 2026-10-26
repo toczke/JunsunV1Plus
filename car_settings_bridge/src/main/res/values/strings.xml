@@ -1,0 +1,42 @@
+<resources>
+    <string name="app_name">Car Settings Bridge</string>
+    <string name="car_settings_title">Car Settings</string>
+    <string name="car_settings_summary">Reversing camera, SWC buttons, DSP, CAN bus, CPU fan</string>
+
+    <!-- Categories -->
+    <string name="category_camera_parking">Camera &amp; Parking</string>
+    <string name="pref_camera_title">Reversing Camera Configuration</string>
+    <string name="pref_camera_summary">AHD format (720p/1080p), guidelines, radar display, mirror flip</string>
+
+    <string name="category_steering_wheel">Steering Wheel Controls</string>
+    <string name="pref_swc_title">Steering Wheel Keys Learning (SWC)</string>
+    <string name="pref_swc_summary">Map resistive analog steering wheel keys (KEY1 / KEY2)</string>
+
+    <string name="category_canbus">CAN Bus &amp; Vehicle</string>
+    <string name="pref_can_title">CAN Box &amp; Vehicle Model</string>
+    <string name="pref_can_summary">Select CAN decoder protocol, car brand, model, and climate overlay</string>
+
+    <string name="category_audio_dsp">Audio &amp; Equalizer</string>
+    <string name="pref_dsp_title">Digital Signal Processor (DSP)</string>
+    <string name="pref_dsp_summary">32-band equalizer, sound field, time delay, bass boost, subwoofer</string>
+
+    <string name="category_hardware_fan">Hardware &amp; Cooling</string>
+    <string name="pref_fan_title">CPU Cooling Fan</string>
+    <string name="pref_fan_summary">Set temperature threshold and test electric fan</string>
+    <string name="pref_colorkey_title">RGB Touch Button Backlight</string>
+    <string name="pref_colorkey_summary">Customize LED panel backlight color and effects</string>
+
+    <string name="category_factory">Factory &amp; Advanced</string>
+    <string name="pref_factory_title">Factory Settings (Direct Access)</string>
+    <string name="pref_factory_summary">Full engineering menu (Radio tuner, LVDS display, system configs)</string>
+
+    <string name="category_external_apps">Integrated Vehicle Apps</string>
+    <string name="pref_dvr_title">Dashcam / Car DVR</string>
+    <string name="pref_dvr_summary">Front video recorder app (com.ankai.cardvr)</string>
+    <string name="pref_tpms_title">Tire Pressure Monitor (TPMS)</string>
+    <string name="pref_tpms_summary">Live tire pressure and temperature status</string>
+    <string name="pref_dvd_title">External DVD Player</string>
+    <string name="pref_dvd_summary">USB DVD-ROM playback</string>
+
+    <string name="toast_launch_failed">Failed to launch target activity: %s</string>
+</resources>

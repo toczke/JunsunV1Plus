@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.CarSettings" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorPrimaryDark">#1976D2</item>
+        <item name="colorAccent">#00BCD4</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
+</resources>

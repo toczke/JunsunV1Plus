@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_car_settings"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CarSettings">
+
+        <!-- Top-level Settings Tile injected into Stock Android Settings -->
+        <activity
+            android:name=".CarSettingsMainActivity"
+            android:exported="true"
+            android:label="@string/car_settings_title"
+            android:screenOrientation="sensorLandscape">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <!-- Category to appear in Stock AOSP Settings Dashboard -->
+                <category android:name="com.android.settings.category.ia.homepage" />
+            </intent-filter>
+
+            <!-- Metadata required by AOSP Settings Dashboard -->
+            <meta-data
+                android:name="com.android.settings.category"
+                android:value="com.android.settings.category.ia.homepage" />
+            <meta-data
+                android:name="com.android.settings.title"
+                android:value="@string/car_settings_title" />
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:value="@string/car_settings_summary" />
+            <meta-data
+                android:name="com.android.settings.icon"
+                android:resource="@drawable/ic_car_settings" />
+            <meta-data
+                android:name="com.android.settings.order"
+                android:value="-50" />
+        </activity>
+
+    </application>
+
+</manifest>
