@@ -63,8 +63,10 @@ jobs:
         run: |
           sudo apt-get clean
           sudo rm -rf /usr/share/dotnet /etc/mysql /var/lib/mysql /usr/local/lib/android /opt/ghc
-          # Create 8GB swap space to prevent OOM
-          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          # Safely replace default 4GB swap with 10GB swap to prevent OOM
+          sudo swapoff -a || true
+          sudo rm -f /swapfile || true
+          sudo fallocate -l 10G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=10240
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
