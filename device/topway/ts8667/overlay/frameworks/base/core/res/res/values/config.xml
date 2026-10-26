@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Automotive overlay for Junsun V1 Plus / Topway TS8667
+    Enforces persistent 16:9 widescreen landscape orientation (1280x720)
+-->
+<resources>
+    <!-- Screen orientation locked to landscape -->
+    <bool name="config_allowAllRotations">false</bool>
+    <bool name="config_reverseDefaultRotation">false</bool>
+
+    <!-- Automotive audio volume steps -->
+    <integer name="config_audio_ring_vol_steps">15</integer>
+    <integer name="config_audio_music_vol_steps">30</integer>
+
+    <!-- Disallow ambient light sleep triggers in automotive dash -->
+    <bool name="config_supportDoubleTapWake">false</bool>
+</resources>

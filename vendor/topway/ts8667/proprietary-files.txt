@@ -1,0 +1,32 @@
+# ==============================================================================
+# Proprietary Blobs List for Junsun V1 Plus / TS8667 (Android 13 Bringup)
+# Extracted from Stock System & Vendor partitions
+# ==============================================================================
+
+# MCU & Hardware Interfacing
+system/lib/libts67xhw.so
+system/lib/libcan59.so
+system/lib/libts70xicfg.so
+system/lib/libpymatch.so
+
+# MediaTek SoC Display & GPU
+vendor/lib64/egl/libGLES_mali.so
+vendor/lib/egl/libGLES_mali.so
+vendor/lib64/hw/gralloc.mt6768.so
+vendor/lib/hw/gralloc.mt6768.so
+vendor/lib64/hw/hwcomposer.mt6768.so
+vendor/lib/hw/hwcomposer.mt6768.so
+
+# Audio & DSP Processing
+vendor/lib/hw/audio.primary.mt6768.so
+vendor/lib64/hw/audio.primary.mt6768.so
+
+# Cameras & 360 AVM TP2850
+vendor/lib/hw/camera.mt6768.so
+vendor/lib64/hw/camera.mt6768.so
+vendor/lib/libcamalgo.so
+vendor/lib64/libcamalgo.so
+
+# Modem & RIL
+vendor/lib64/mtk-ril.so
+vendor/lib/mtk-ril.so
