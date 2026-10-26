@@ -1,1 +1,6 @@
 out/
+prebuilt_apks/
+vendor/topway/ts8667/proprietary/
+*.img
+*.zip
+*.gz

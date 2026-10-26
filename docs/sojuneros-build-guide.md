@@ -109,11 +109,25 @@ cat out/8667.upd
 6. **Do not interrupt power** during the 5–7 minute flashing sequence.
 7. Remove the USB drive when prompted by the green "Update Successful" screen.
 
-### Method B: Flashing via TWRP Recovery
-1. Boot into TWRP using the `TS8667_TWRP_Flasher` APK or `adb reboot recovery`.
-2. Connect USB drive with update zip or image.
-3. In TWRP:
-   - Select **Install** > **Install Image**.
-   - Select target partition (`Super` or `System Image`).
-   - Swipe to confirm Flash.
-   - Wipe Dalvik/Cache and Reboot System.
+### Method B: Flashing via TWRP Recovery Flashable ZIP
+1. Take a full TWRP backup of `Boot`, `System`, `Vendor`, and `Product` to an external USB drive (safety rollback net).
+2. Copy `SojunerOS-20.0-TS8667-Install.zip` to your USB drive:
+   - **File:** `out/sojuneros/SojunerOS-20.0-TS8667-Install.zip`
+   - **Size:** 2,832.00 MB
+   - **SHA-256:** `ad63cf29d42f784788dea6a0b93eb4969f2d6d338ba546669727350f4890b646`
+3. Boot into TWRP:
+   - Run `TS8667_TWRP_Flasher` APK or execute `adb reboot recovery`.
+4. In TWRP:
+   - Tap **Install**.
+   - Select `SojunerOS-20.0-TS8667-Install.zip`.
+   - The integrated dynamic partition `update-binary` automatically extracts and flashes the adapted LineageOS 20 system image directly to the dynamic `system` mapper block device.
+   - Tap **Wipe Dalvik / Cache**.
+   - Tap **Reboot System**.
+
+### Method C: Flashing System Image Directly via Fastbootd
+If using fastboot userspace mode:
+```bash
+adb reboot fastboot
+fastboot flash system sojuneros-20.0-ts8667-system.img
+fastboot reboot
+```
