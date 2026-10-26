@@ -5,6 +5,10 @@ Complete technical reverse-engineering documentation, hardware specifications, p
 ---
 
 ## 📑 Documentation Index
+9. [Custom ROM Feasibility (Android 12 to 17)](docs/09_custom_rom_feasibility_analysis.md)
+   - Deep architectural audit: GKI, Linux 4.19 kernel, VNDK bridges, 16KB page size constraint.
+   - Preserving MCU serial, CAN bus, ROHM BD3702 DSP, Techpoint 360° AVM with DiPlay.
+   - 3 implementation paths and full step-by-step porting blueprint.
 
 1. [Hardware & Platform Architecture](docs/01_hardware_architecture.md)
    - SoC, Octa-Core big.LITTLE CPU details, GPU, memory, power management (MT6358).
