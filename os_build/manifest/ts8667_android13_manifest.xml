@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest>
+  <remote name="aosp" fetch="https://android.googlesource.com" />
+  <remote name="lineage" fetch="https://github.com/LineageOS" />
+  <remote name="mt6768" fetch="https://github.com/mt6768-dev" />
+  <remote name="github" fetch="https://github.com" />
+
+  <default revision="lineage-20.0" remote="lineage" sync-j="4" />
+
+  <!-- MT6768 Kernel 4.19 Source targeting Android 13 -->
+  <project path="kernel/topway/ts8667" name="android_kernel_xiaomi_mt6768-k419" remote="mt6768" revision="lineage-20.0" />
+
+  <!-- Device Tree Configuration -->
+  <project path="device/topway/ts8667" name="toczke/JunsunV1Plus" remote="github" revision="master" />
+
+  <!-- MediaTek Common Hardware HALs -->
+  <project path="hardware/mediatek" name="android_hardware_mediatek" remote="lineage" revision="lineage-20.0" />
+</manifest>
