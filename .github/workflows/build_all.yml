@@ -1,4 +1,4 @@
-name: Build APK and TWRP
+name: Build APKs and TWRP
 
 on:
   workflow_dispatch:
@@ -23,44 +23,52 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '7.6'
 
-      - name: Build Installer APK with Gradle
+      - name: Build Installer APK
         run: |
           cd installer_apk
-          gradle wrapper --gradle-version 7.6
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
 
-      - name: Build Car Settings Bridge APK with Gradle
+      - name: Build Car Settings Bridge APK
         run: |
           cd car_settings_bridge
-          gradle wrapper --gradle-version 7.6
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --stacktrace
 
       - name: Upload Installer APK
         uses: actions/upload-artifact@v4
         with:
           name: TS8667_TWRP_Flasher_APK
-          path: installer_apk/app/build/outputs/apk/debug/app-debug.apk
+          path: installer_apk/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
       - name: Upload Car Settings Bridge APK
         uses: actions/upload-artifact@v4
         with:
           name: TS8667_Car_Settings_Bridge_APK
-          path: car_settings_bridge/build/outputs/apk/debug/car_settings_bridge-debug.apk
+          path: car_settings_bridge/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
 
   build_twrp:
     name: Build TWRP Recovery Image
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Free Disk Space
+      - name: Free Disk Space & Setup Swap
         run: |
           sudo apt-get clean
           sudo rm -rf /usr/share/dotnet /etc/mysql /var/lib/mysql /usr/local/lib/android /opt/ghc
+          # Create 8GB swap space to prevent OOM
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
           df -h
 
       - name: Set up Build Environment
@@ -75,7 +83,7 @@ jobs:
       - name: Install Repo Tool
         run: |
           mkdir -p ~/bin
-          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
           chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
@@ -85,8 +93,8 @@ jobs:
           cd ~/twrp
           git config --global user.name "Antigravity CI"
           git config --global user.email "ci@antigravity.local"
-          repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0
-          repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
+          ~/bin/repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-10.0
+          ~/bin/repo sync -c -j$(nproc --all) --no-tags --no-clone-bundle --force-sync
 
       - name: Place Device Tree
         run: |
