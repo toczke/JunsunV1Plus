@@ -5,11 +5,6 @@ Complete technical reverse-engineering documentation, hardware specifications, p
 ---
 
 ## 📑 Documentation Index
-8. [Modern Custom OS Strategy](docs/08_modern_custom_os_strategy.md)
-   - Decoupling hardware services (MCU, CAN, DSP, 360° AVM) from the user layer.
-   - Removing stock CarPlay/Android Auto (sd_carplay, CarLetter, EasyConnect) for DiPlay.
-   - Custom headunit ROM ecosystem analysis (DUDU-OS, Malaysk, Hal9k).
-   - 3-phase implementation roadmap.
 
 1. [Hardware & Platform Architecture](docs/01_hardware_architecture.md)
    - SoC, Octa-Core big.LITTLE CPU details, GPU, memory, power management (MT6358).
@@ -52,6 +47,42 @@ Complete technical reverse-engineering documentation, hardware specifications, p
    - Landscape mode configuration (1280x720).
    - Device tree for TWRP compilation (`BoardConfig.mk`, `recovery.fstab`).
    - Splicing repacked recovery into `8667.bin` and updating `8667.upd`.
+
+8. [Modern Custom OS Strategy](docs/08_modern_custom_os_strategy.md)
+   - Decoupling hardware services (MCU, CAN, DSP, 360° AVM) from the user layer.
+   - Removing stock CarPlay/Android Auto (`sd_carplay`, `CarLetter`, `EasyConnect`) for DiPlay.
+   - Custom headunit ROM ecosystem analysis (DUDU-OS, Malaysk, Hal9k).
+   - 3-phase implementation roadmap.
+
+---
+
+## 🕵️‍♂️ Privacy & Backdoor Reality Check: What Can the Chinese Vendor Actually See?
+
+When buying a Chinese Android headunit (Junsun, Topway, FYT, Mekede), many users ask:
+> *"Does the manufacturer have a backdoor into my car? Can they track where I drive, listen through the microphone, or read my data?"*
+
+Based on reverse-engineering the stock firmware binaries, here is the plain-English truth:
+
+### 1. What the Chinese Vendor CANNOT Do (No Active Remote Spyware)
+- **No Active Cloud Spyware:** There is no hidden background daemon continuously streaming your microphone, front dashcam video, or GPS location to servers in China. The core car framework (`MainUI.apk`, `AVM2.apk`) contains zero hardcoded remote telemetry URLs or reporting servers.
+- **No Remote Cellular Backdoor:** The 4G LTE modem and SIM subsystem run standard MediaTek RIL (`mtk-ril.so`). The vendor cannot remotely dial in or wake up the headunit when the car ignition is off (`sys.ipo.pwrdncap=2` deep standby).
+
+### 2. What the Chinese Vendor / Third Parties DO Collect (Telemetry & Licensing)
+- **App Activation & Fingerprinting:**
+  - Apps like **`CarLetter`**, **`EasyConnect`**, and **`TsActivateCarDev`** check hardware licensing. When connected to Wi-Fi or mobile data, they phone home to licensing servers with:
+    - Your headunit's motherboard serial number / UUID.
+    - MediaTek modem IMEI and MAC addresses.
+    - Approximate location via IP address.
+- **EasyConnect Data Collection:**
+  - `EasyConnect` is known in the automotive reverse-engineering community for aggressively logging phone device IDs, phone models, and connection timestamps when you plug in your phone via USB.
+- **OTA Update Heartbeat (`TsUpgrade.apk`):**
+  - When the unit has an internet connection, the OTA updater queries Topway update servers with your firmware build version (`QP1A.190711.020`, `p5spm8666p164P2`) to check if an update is available.
+
+### 3. The REAL Threat: Local Security Vulnerabilities
+The real security danger on this headunit is not state-sponsored surveillance, but **complete lack of local device security**:
+1. **Pre-installed Unauthenticated Root (`ffsu`):** Any malicious Android app you install from the Play Store or via APK can silently execute `/system/xbin/ffsu` or `/system/bin/rootremount` and gain full `uid=0` root access without prompting you.
+2. **Open Wireless ADB:** Because `persist.sys.usb.config=adb` is enabled by default, anyone on the same Wi-Fi network (or vehicle hotspot) who runs `adb connect <headunit_ip>:5555` can gain an unrestricted root shell, take screenshots, install apps, or read files from `/data`.
+3. **Hardcoded Master Passwords:** Physical or passenger access to the Settings app allows entering `8888` or `3368` to alter critical MCU CAN bus parameters, display timings, or wipe calibration data.
 
 ---
 
