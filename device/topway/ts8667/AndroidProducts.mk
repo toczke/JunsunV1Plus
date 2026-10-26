@@ -1,6 +1,6 @@
 PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/device.mk
+    $(LOCAL_DIR)/lineage_ts8667.mk
 
 COMMON_LUNCH_CHOICES := \
-    ts8667-userdebug \
-    ts8667-eng
+    lineage_ts8667-userdebug \
+    lineage_ts8667-eng
