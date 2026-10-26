@@ -52,6 +52,20 @@ index 9b3df24e2..4e30d7559 100644
  obj-$(CONFIG_NXP_P73_DEVICES) += p73-spi/
 +
 +obj-$(CONFIG_KSU) += kernelsu/
+diff --git a/drivers/android/binder.c b/drivers/android/binder.c
+index c5266b2aa..95c96d644 100644
+--- a/drivers/android/binder.c
++++ b/drivers/android/binder.c
+@@ -7012,8 +7012,7 @@ static int __init binder_init(void)
+ #endif
+ 	}
+ 
+-	if (!IS_ENABLED(CONFIG_ANDROID_BINDERFS) &&
+-	    strcmp(binder_devices_param, "") != 0) {
++	if (strcmp(binder_devices_param, "") != 0) {
+ 		/*
+ 		* Copy the module_parameter string, because we don't want to
+ 		* tokenize it in-place.
 diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
 index 9f937b8bc..cfa3df1dc 100644
 --- a/drivers/clocksource/Makefile
@@ -255,6 +269,25 @@ index 117d4f001..f98905b68 100644
  
  88pm860x-objs			:= 88pm860x-core.o 88pm860x-i2c.o
  obj-$(CONFIG_MFD_88PM860X)	+= 88pm860x.o
+diff --git a/drivers/mfd/ti-lmu.c b/drivers/mfd/ti-lmu.c
+index 4d33b6848..049ac69b6 100644
+--- a/drivers/mfd/ti-lmu.c
++++ b/drivers/mfd/ti-lmu.c
+@@ -180,9 +180,11 @@ static int ti_lmu_probe(struct i2c_client *cl, const struct i2c_device_id *id)
+ 
+     extern char *saved_command_line;
+     int bkl_id = 0;
+-    char *bkl_ptr = (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line));
+-    bkl_ptr += strlen(":bklic=");
+-    bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++    char *bkl_ptr = saved_command_line ? (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line)) : NULL;
++    if (bkl_ptr) {
++        bkl_ptr += strlen(":bklic=");
++        bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++    }
+ 
+ 	printk("[%s]: *liuyundong*, bkl_id = %d\n", __func__, bkl_id);
+     if (bkl_id != 1) {
 diff --git a/drivers/misc/cxl/Makefile b/drivers/misc/cxl/Makefile
 index 502d41fc9..a8333e77a 100644
 --- a/drivers/misc/cxl/Makefile
@@ -295,6 +328,60 @@ index 15fb3fdf2..45f7bed45 100644
  subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6391)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6391
  subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6355)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6355
  subdir-ccflags-$(CONFIG_MTK_PMIC_CHIP_MT6357)+= -I$(srctree)/drivers/misc/mediatek/accdet/mt6357
+diff --git a/drivers/misc/mediatek/aee/mrdump/mrdump_mini.c b/drivers/misc/mediatek/aee/mrdump/mrdump_mini.c
+index 6e2c28de8..59061791e 100644
+--- a/drivers/misc/mediatek/aee/mrdump/mrdump_mini.c
++++ b/drivers/misc/mediatek/aee/mrdump/mrdump_mini.c
+@@ -762,7 +762,7 @@ EXPORT_SYMBOL(mrdump_mini_ke_cpu_regs);
+ static void mrdump_mini_fatal(const char *str)
+ {
+ 	LOGE("minirdump: FATAL:%s\n", str);
+-	BUG();
++	WARN_ON(1);
+ }
+ 
+ static unsigned int mrdump_mini_addr;
+@@ -960,11 +960,10 @@ static void __init mrdump_mini_elf_header_init(void)
+ 		LOGE("minirdump: [DT] illegal value 0x%x(0x%x)\n",
+ 				mrdump_mini_addr,
+ 				mrdump_mini_size);
+-		mrdump_mini_fatal("illegal addr size");
++		return;
+ 	}
+ 	if (mrdump_mini_ehdr == NULL) {
+ 		LOGE("mrdump mini reserve buffer fail");
+-		mrdump_mini_fatal("header null pointer");
+ 		return;
+ 	}
+ 	memset_io(mrdump_mini_ehdr, 0, MRDUMP_MINI_HEADER_SIZE +
+diff --git a/drivers/misc/mediatek/atf/mt_secure_call.c b/drivers/misc/mediatek/atf/mt_secure_call.c
+index 8198719be..e03b6fd23 100644
+--- a/drivers/misc/mediatek/atf/mt_secure_call.c
++++ b/drivers/misc/mediatek/atf/mt_secure_call.c
+@@ -11,6 +11,7 @@
+  * GNU General Public License for more details.
+  */
+ #include <linux/kernel.h>
++#include <linux/psci.h>
+ #include <mt-plat/mtk_secure_api.h>
+ #ifndef CONFIG_ARM64
+ #include <asm/opcodes-sec.h>
+@@ -41,6 +42,15 @@ size_t mt_secure_call_all(size_t function_id,
+ {
+ 	LOCAL_REG_SET_DECLARE;
+ 
++#if defined(CONFIG_ARM_PSCI_FW)
++	if (psci_ops.conduit != PSCI_CONDUIT_SMC) {
++		if (r1) *r1 = 0;
++		if (r2) *r2 = 0;
++		if (r3) *r3 = 0;
++		return (size_t)SIP_SVC_E_NOT_SUPPORTED;
++	}
++#endif
++
+ #ifdef CONFIG_ARM64
+ 	__asm__ volatile ("smc #0x0\n" : "+r"(reg0),
+ 		"+r"(reg1), "+r"(reg2), "+r"(reg3), "+r"(reg4));
 diff --git a/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile b/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile
 index 0ad7e2727..380873cab 100644
 --- a/drivers/misc/mediatek/base/power/ppm_v3/src/Makefile
@@ -359,6 +446,21 @@ index 432853a8e..754179841 100644
  #include <linux/atomic.h>
  
  DEFINE_MUTEX(mtk_idle_module_locker);
+diff --git a/drivers/misc/mediatek/base/power/spm/mt6765/mtk_spm.c b/drivers/misc/mediatek/base/power/spm/mt6765/mtk_spm.c
+index ec344dad9..a8f9c85db 100644
+--- a/drivers/misc/mediatek/base/power/spm/mt6765/mtk_spm.c
++++ b/drivers/misc/mediatek/base/power/spm/mt6765/mtk_spm.c
+@@ -259,6 +259,10 @@ static int spm_module_init(void)
+ 	wakeup_source_init(&spm_wakelock, "spm");
+ 
+ 	spm_register_init(&spm_irq_0);
++	if (!spm_base) {
++		pr_info("[SPM] spm_base is null, skipping spm init\n");
++		return 0;
++	}
+ 
+ 	/* implemented in mtk_spm_irq.c */
+ 	if (mtk_spm_irq_register(spm_irq_0) != 0)
 diff --git a/drivers/misc/mediatek/base/power/spm/mt6768/Makefile b/drivers/misc/mediatek/base/power/spm/mt6768/Makefile
 index dd3023ac2..a814a9dfe 100644
 --- a/drivers/misc/mediatek/base/power/spm/mt6768/Makefile
@@ -369,6 +471,21 @@ index dd3023ac2..a814a9dfe 100644
  # Include mtk_idle_internal.h for MTK_IDLE_OPT_XXX
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/spm/common/
  # Include mt-plat/upmu_common.h
+diff --git a/drivers/misc/mediatek/base/power/spm/mt6768/mtk_spm.c b/drivers/misc/mediatek/base/power/spm/mt6768/mtk_spm.c
+index 523292c1f..58fa73317 100644
+--- a/drivers/misc/mediatek/base/power/spm/mt6768/mtk_spm.c
++++ b/drivers/misc/mediatek/base/power/spm/mt6768/mtk_spm.c
+@@ -286,6 +286,10 @@ static int spm_module_init(void)
+ 	wakeup_source_init(&spm_wakelock, "spm");
+ 
+ 	spm_register_init(&spm_irq_0);
++	if (!spm_base) {
++		pr_info("[SPM] spm_base is null, skipping spm init\n");
++		return 0;
++	}
+ 
+ 	/* implemented in mtk_spm_irq.c */
+ 	if (mtk_spm_irq_register(spm_irq_0) != 0)
 diff --git a/drivers/misc/mediatek/base/power/swpm_v1/Makefile b/drivers/misc/mediatek/base/power/swpm_v1/Makefile
 index 7653b4b76..f539578ea 100644
 --- a/drivers/misc/mediatek/base/power/swpm_v1/Makefile
@@ -429,6 +546,104 @@ index 102103156..16a20ab2f 100644
  endif
  
  obj-y += mtk_swpm_platform.o
+diff --git a/drivers/misc/mediatek/base/power/upower_v2/mtk_unified_power.c b/drivers/misc/mediatek/base/power/upower_v2/mtk_unified_power.c
+index 3020432f3..75a079bbc 100644
+--- a/drivers/misc/mediatek/base/power/upower_v2/mtk_unified_power.c
++++ b/drivers/misc/mediatek/base/power/upower_v2/mtk_unified_power.c
+@@ -674,6 +674,11 @@ static int __init upower_get_tbl_ref(void)
+ 	upower_data_virt_addr = sspm_reserve_mem_get_virt(UPD_MEM_ID);
+ 	upower_data_size = sspm_reserve_mem_get_size(UPD_MEM_ID);
+ 
++	if (!upower_data_virt_addr) {
++		pr_info("upower: no sspm reserved memory, skipping sspm upower table\n");
++		return 0;
++	}
++
+ 	upower_debug("phy_addr = 0x%llx, virt_addr=0x%llx\n",
+ 		     (unsigned long long)upower_data_phy_addr,
+ 		     (unsigned long long)upower_data_virt_addr);
+diff --git a/drivers/misc/mediatek/btif/common/btif_dma_plat.c b/drivers/misc/mediatek/btif/common/btif_dma_plat.c
+index 7aac3bcf2..5c4ba180c 100644
+--- a/drivers/misc/mediatek/btif/common/btif_dma_plat.c
++++ b/drivers/misc/mediatek/btif/common/btif_dma_plat.c
+@@ -413,10 +413,17 @@ int hal_btif_dma_hw_init(struct _MTK_DMA_INFO_STR_ *p_dma_info)
+ {
+ 	int i_ret = 0;
+ 	unsigned int dat = 0, count = 0;
+-	unsigned long base = p_dma_info->base;
++	unsigned long base;
+ 	unsigned long addr_h = 0;
+-	struct _DMA_VFIFO_ *p_vfifo = p_dma_info->p_vfifo;
+-	struct _MTK_BTIF_DMA_VFIFO_ *p_mtk_dma_vfifo = container_of(p_vfifo,
++	struct _DMA_VFIFO_ *p_vfifo;
++	struct _MTK_BTIF_DMA_VFIFO_ *p_mtk_dma_vfifo;
++
++	if (!p_dma_info || !p_dma_info->base)
++		return -ENODEV;
++
++	base = p_dma_info->base;
++	p_vfifo = p_dma_info->p_vfifo;
++	p_mtk_dma_vfifo = container_of(p_vfifo,
+ 			struct _MTK_BTIF_DMA_VFIFO_, vfifo);
+ 
+ 	if (p_dma_info->dir == DMA_DIR_RX) {
+diff --git a/drivers/misc/mediatek/btif/common/btif_plat.c b/drivers/misc/mediatek/btif/common/btif_plat.c
+index bfef3cd93..89a523c8c 100644
+--- a/drivers/misc/mediatek/btif/common/btif_plat.c
++++ b/drivers/misc/mediatek/btif/common/btif_plat.c
+@@ -479,7 +479,11 @@ int hal_btif_clk_ctrl(struct _MTK_BTIF_INFO_STR_ *p_btif,
+ static int btif_new_handshake_ctrl(struct _MTK_BTIF_INFO_STR_ *p_btif,
+ 				   bool enable)
+ {
+-	unsigned long base = p_btif->base;
++	unsigned long base;
++
++	if (!p_btif || !p_btif->base)
++		return -ENODEV;
++	base = p_btif->base;
+ 
+ 	if (enable == true)
+ 		BTIF_SET_BIT(BTIF_HANDSHAKE(base), BTIF_HANDSHAKE_EN_HANDSHAKE);
+@@ -502,7 +506,13 @@ int hal_btif_hw_init(struct _MTK_BTIF_INFO_STR_ *p_btif)
+ {
+ /*Chaozhong: To be implement*/
+ 	int i_ret = -1;
+-	unsigned long base = p_btif->base;
++	unsigned long base;
++
++	if (!p_btif || !p_btif->base) {
++		BTIF_ERR_FUNC("hal_btif_hw_init: base is NULL or invalid\n");
++		return -ENODEV;
++	}
++	base = p_btif->base;
+ 
+ #if NEW_TX_HANDLING_SUPPORT
+ 	_btif_tx_fifo_reset(p_btif);
+diff --git a/drivers/misc/mediatek/btif/common/mtk_btif.c b/drivers/misc/mediatek/btif/common/mtk_btif.c
+index 89d691fca..8b95bd888 100644
+--- a/drivers/misc/mediatek/btif/common/mtk_btif.c
++++ b/drivers/misc/mediatek/btif/common/mtk_btif.c
+@@ -1519,8 +1519,18 @@ int btif_clock_ctrl(struct _mtk_btif_ *p_btif, int en)
+ int _btif_controller_setup(struct _mtk_btif_ *p_btif)
+ {
+ 	int i_ret = -1;
+-	struct _MTK_BTIF_INFO_STR_ *p_btif_info = p_btif->p_btif_info;
+-	struct _MTK_BTIF_IRQ_STR_ *p_btif_irq = p_btif_info->p_irq;
++	struct _MTK_BTIF_INFO_STR_ *p_btif_info;
++	struct _MTK_BTIF_IRQ_STR_ *p_btif_irq;
++
++	if (!p_btif || !p_btif->p_btif_info)
++		return -ENODEV;
++
++	p_btif_info = p_btif->p_btif_info;
++	if (!p_btif_info->base) {
++		BTIF_ERR_FUNC("BTIF base is NULL (hardware absent)\n");
++		return -ENODEV;
++	}
++	p_btif_irq = p_btif_info->p_irq;
+ 
+ /*BTIF rx buffer init*/
+ /* memset(p_btif->rx_buf, 0, BTIF_RX_BUFFER_SIZE); */
 diff --git a/drivers/misc/mediatek/ccu/src/mt6768/Makefile b/drivers/misc/mediatek/ccu/src/mt6768/Makefile
 index 9354a1a87..846079960 100644
 --- a/drivers/misc/mediatek/ccu/src/mt6768/Makefile
@@ -609,6 +824,70 @@ index 9a104b13e..3e11faf2a 100644
  
  static void __iomem **plat_dbg_info_base;
  static unsigned int *plat_dbg_info_size;
+diff --git a/drivers/misc/mediatek/dramc/mt6765/mtk_dramc.c b/drivers/misc/mediatek/dramc/mt6765/mtk_dramc.c
+index 39195f216..a764f25a0 100644
+--- a/drivers/misc/mediatek/dramc/mt6765/mtk_dramc.c
++++ b/drivers/misc/mediatek/dramc/mt6765/mtk_dramc.c
+@@ -116,6 +116,8 @@ const char *uname, int depth, void *data)
+ 		get_dram_info =
+ 			(struct dram_info *)of_get_flat_dt_prop(node,
+ 				"orig_dram_info", NULL);
++		if (!get_dram_info)
++			return 0;
+ 
+ 		g_dram_info_dummy_read = &dram_info_dummy_read;
+ 		dram_rank_num = get_dram_info->rank_num;
+@@ -1130,6 +1132,9 @@ unsigned int ucDram_Register_Read(unsigned int u4reg_addr)
+ 
+ unsigned int lpDram_Register_Read(unsigned int Reg_base, unsigned int Offset)
+ {
++	if (!DRAMC_AO_CHA_BASE_ADDR && !DRAMC_NAO_CHA_BASE_ADDR)
++		return 0;
++
+ 	if ((Reg_base == DRAMC_NAO_CHA) && (Offset < 0x1000))
+ 		return readl(IOMEM(DRAMC_NAO_CHA_BASE_ADDR + Offset));
+ 
+@@ -1841,7 +1846,7 @@ static int __init dram_test_init(void)
+ 		dramc_info("find dt_scan_dram_info\n");
+ 	} else {
+ 		dramc_info("can't find dt_scan_dram_info\n");
+-		return -1;
++		return 0;
+ 	}
+ 
+ 	return ret;
+diff --git a/drivers/misc/mediatek/dramc/mt6768/mtk_dramc.c b/drivers/misc/mediatek/dramc/mt6768/mtk_dramc.c
+index 52096b22a..68b11e4b8 100644
+--- a/drivers/misc/mediatek/dramc/mt6768/mtk_dramc.c
++++ b/drivers/misc/mediatek/dramc/mt6768/mtk_dramc.c
+@@ -76,6 +76,8 @@ const char *uname, int depth, void *data)
+ 		get_dram_info =
+ 			(struct dram_info *)of_get_flat_dt_prop(node,
+ 				"orig_dram_info", NULL);
++		if (!get_dram_info)
++			return 0;
+ 
+ 		g_dram_info_dummy_read = &dram_info_dummy_read;
+ 		dram_rank_num = get_dram_info->rank_num;
+@@ -602,6 +604,9 @@ int Binning_DRAM_complex_mem_test(void)
+ 
+ unsigned int lpDram_Register_Read(unsigned int Reg_base, unsigned int Offset)
+ {
++	if (!DRAMC_AO_CHA_BASE_ADDR && !DRAMC_NAO_CHA_BASE_ADDR)
++		return 0;
++
+ 	if ((Reg_base == DRAMC_NAO_CHA) && (Offset < 0x1000))
+ 		return readl(IOMEM(DRAMC_NAO_CHA_BASE_ADDR + Offset));
+ 
+@@ -944,7 +949,7 @@ static int __init dram_test_init(void)
+ 		dramc_info("find dt_scan_dram_info\n");
+ 	} else {
+ 		dramc_info("can't find dt_scan_dram_info\n");
+-		return -1;
++		return 0;
+ 	}
+ 	return ret;
+ }
 diff --git a/drivers/misc/mediatek/eccci/Makefile b/drivers/misc/mediatek/eccci/Makefile
 index 0f9e9ff5e..4b6febc45 100644
 --- a/drivers/misc/mediatek/eccci/Makefile
@@ -767,757 +1046,6 @@ index d6ca4bb18..1ece28001 100644
  ccflags-y += -I$(MTK_CUSTOM_PATH)/imgsensor/inc \
  
  obj-y		+= regulator/
-diff --git a/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile
-new file mode 100644
-index 000000000..d66da2203
---- /dev/null
-+++ b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/Makefile
-@@ -0,0 +1,3 @@
-+# SPDX-License-Identifier: GPL-2.0
-+obj-y += hx8394d_hd480_dsi_vdo.o
-+ccflags-$(CONFIG_MTK_LCM) += -I$(srctree)/drivers/misc/mediatek/lcm/inc
-diff --git a/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c
-new file mode 100644
-index 000000000..433b0473d
---- /dev/null
-+++ b/drivers/misc/mediatek/lcm/hx8394d_hd480_dsi_vdo/hx8394d_hd480_dsi_vdo.c
-@@ -0,0 +1,736 @@
-+/*
-+ * Copyright (C) 2015 MediaTek Inc.
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+
-+#ifdef BUILD_LK
-+#include <string.h>
-+#include <platform/mt_gpio.h>
-+#include <platform/mt_pmic.h>
-+#include <platform/upmu_common.h>
-+#include <platform/mt_i2c.h>
-+#include <platform/mt_pmic.h>
-+#elif defined(BUILD_UBOOT)
-+#include <asm/arch/mt_gpio.h>
-+#else
-+#include <linux/wait.h>
-+#include <linux/platform_device.h>
-+#include <linux/gpio.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/of_gpio.h>
-+#include <linux/gpio.h>
-+#include <asm-generic/gpio.h>
-+#include <linux/string.h>
-+#include <linux/gpio.h>
-+#include <linux/pinctrl/consumer.h>
-+#endif
-+
-+#ifdef CONFIG_OF
-+#include <linux/regulator/consumer.h>
-+#endif
-+
-+#include "lcm_drv.h"
-+static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output);
-+#ifndef BUILD_LK
-+static unsigned int LCD_RST_PIN;
-+static unsigned int LCD_PWR_EN_PIN;
-+static unsigned int LCD_PWR_BIAS_ENP_PIN;
-+void lcm_request_gpio_control(struct device *dev)
-+{
-+	LCD_RST_PIN = of_get_named_gpio(dev->of_node, "lcd_rst_pin", 0);
-+	gpio_request(LCD_RST_PIN, "LCD_RST_PIN");
-+
-+	LCD_PWR_EN_PIN = of_get_named_gpio(dev->of_node, "lcd_pwr_en_pin", 0);
-+	gpio_request(LCD_PWR_EN_PIN, "LCD_PWR_EN_PIN");
-+
-+	LCD_PWR_BIAS_ENP_PIN =
-+		of_get_named_gpio(dev->of_node, "lcd_pwr_bias_enp_pin", 0);
-+	gpio_request(LCD_PWR_BIAS_ENP_PIN, "LCD_PWR_BIAS_ENP_PIN");
-+}
-+
-+static int lcm_driver_probe(struct device *dev, void const *data)
-+{
-+	lcm_request_gpio_control(dev);
-+	lcm_set_gpio_output(LCD_PWR_EN_PIN, 1);
-+	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, 1);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id lcm_platform_of_match[] = {
-+	{
-+	 .compatible = "jdi,jd9365_dsi_vdo",
-+	 .data = 0,
-+	 }, {
-+	     /* sentinel */
-+	}
-+};
-+
-+MODULE_DEVICE_TABLE(of, platform_of_match);
-+
-+static int lcm_platform_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *id;
-+
-+	id = of_match_node(lcm_platform_of_match, pdev->dev.of_node);
-+	if (!id)
-+		return -ENODEV;
-+
-+	return lcm_driver_probe(&pdev->dev, id->data);
-+}
-+
-+static struct platform_driver lcm_driver = {
-+	.probe = lcm_platform_probe,
-+	.driver = {
-+		   .name = "jd9365_dsi_vdo",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = lcm_platform_of_match,
-+		   },
-+};
-+
-+static int __init lcm_init(void)
-+{
-+	pr_debug("LCM: register lcm init driver done\n");
-+	if (platform_driver_register(&lcm_driver)) {
-+		pr_notice("LCM: failed to register this driver!\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static void __exit lcm_exit(void)
-+{
-+	platform_driver_unregister(&lcm_driver);
-+}
-+
-+late_initcall(lcm_init);
-+module_exit(lcm_exit);
-+MODULE_AUTHOR("mediatek");
-+MODULE_DESCRIPTION("LCM display subsystem driver");
-+MODULE_LICENSE("GPL");
-+#endif
-+
-+/* ----------------------------------------------------------------- */
-+/* Local Constants */
-+/* ----------------------------------------------------------------- */
-+#define LCM_DSI_CMD_MODE				0
-+#define FRAME_WIDTH (480)
-+#define FRAME_HEIGHT (1280)
-+
-+#define GPIO_OUT_ONE 1
-+#define GPIO_OUT_ZERO 0
-+
-+#ifdef GPIO_LCM_RST
-+#define GPIO_LCD_RST      GPIO_LCM_RST
-+#endif
-+
-+#ifdef GPIO_LCM_PWR_EN
-+#define GPIO_LCD_PWR_EN      GPIO_LCM_PWR_EN
-+#else
-+#define GPIO_LCD_PWR_EN		0xFFFFFFFF
-+#endif
-+
-+#ifdef GPIO_LCD_BIAS_ENP_PIN
-+#define GPIO_LCD_BIAS_ENP      GPIO_LCD_BIAS_ENP_PIN
-+#endif
-+
-+static struct LCM_UTIL_FUNCS lcm_util;
-+
-+#define SET_RESET_PIN(v) (lcm_util.set_reset_pin((v)))
-+
-+#define UDELAY(n) (lcm_util.udelay(n))
-+#define MDELAY(n) (lcm_util.mdelay(n))
-+
-+/* --------------------------------------------------------------------- */
-+/* Local Functions */
-+/* --------------------------------------------------------------------- */
-+#define dsi_set_cmdq_V2(cmd, count, ppara, force_update) \
-+	lcm_util.dsi_set_cmdq_V2(cmd, count, ppara, force_update)
-+#define dsi_set_cmdq(pdata, queue_size, force_update) \
-+	lcm_util.dsi_set_cmdq(pdata, queue_size, force_update)
-+#define wrtie_cmd(cmd) \
-+	lcm_util.dsi_write_cmd(cmd)
-+#define write_regs(addr, pdata, byte_nums) \
-+	lcm_util.dsi_write_regs(addr, pdata, byte_nums)
-+#define read_reg(cmd) \
-+	lcm_util.dsi_dcs_read_lcm_reg(cmd)
-+#define read_reg_v2(cmd, buffer, buffer_size) \
-+	lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
-+/* ------------------------------------------------ */
-+/* Local Constants */
-+/* ------------------------------------------------ */
-+#define REGFLAG_DELAY                               0xFC
-+#define REGFLAG_END_OF_TABLE                        0xFD
-+/* END OF REGISTERS MARKER */
-+
-+#ifndef TRUE
-+#define TRUE 1
-+#endif
-+
-+#ifndef FALSE
-+#define FALSE 0
-+#endif
-+
-+/* ---------------------------------------------------------------- */
-+/* Local Variables */
-+/* ---------------------------------------------------------------- */
-+static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output)
-+{
-+	if (GPIO == 0xFFFFFFFF) {
-+#ifdef BUILD_LK
-+		printf("[LK/LCM] GPIO_LCD_PWR_EN =   0x%x\n", GPIO_LCD_PWR_EN);
-+		printf("[LK/LCM] GPIO_LCD_BIAS_ENP =   0x%x\n",
-+			GPIO_LCD_BIAS_ENP);
-+		printf("[LK/LCM] GPIO_LCM_RST =   0x%x\n", GPIO_LCD_RST);
-+#else
-+		pr_debug("[Kernel/LCM] GPIO_LCD_PWR_EN =   0x%x\n",
-+			LCD_PWR_EN_PIN);
-+		pr_debug("[Kernel/LCM] GPIO_LCD_BIAS_ENP =   0x%x\n",
-+			LCD_PWR_BIAS_ENP_PIN);
-+		pr_debug("[Kernel/LCM] GPIO_LCM_RST =   0x%x\n", LCD_RST_PIN);
-+#endif
-+		return;
-+	}
-+#ifdef BUILD_LK
-+	mt_set_gpio_mode(GPIO, GPIO_MODE_00);
-+	mt_set_gpio_dir(GPIO, GPIO_DIR_OUT);
-+	mt_set_gpio_out(GPIO, (output > 0) ? GPIO_OUT_ONE : GPIO_OUT_ZERO);
-+#else
-+	gpio_direction_output(GPIO, output);
-+	gpio_set_value(GPIO, output);
-+#endif
-+}
-+
-+struct LCM_setting_table {
-+	unsigned char cmd;
-+	unsigned char count;
-+	unsigned char para_list[64];
-+};
-+
-+#ifndef BUILD_LK
-+static struct LCM_setting_table lcm_suspend_setting[] = {
-+	{0x28, 0, {} },
-+	{0x10, 0, {} },
-+	{REGFLAG_DELAY, 120, {} },
-+	{REGFLAG_END_OF_TABLE, 0x00, {} }
-+};
-+#endif
-+
-+static struct LCM_setting_table lcm_initialization_setting[] = {
-+	{0xE0, 1, {0x00} },
-+
-+	{0xE1, 1, {0x93} },
-+	{0xE2, 1, {0x65} },
-+	{0xE3, 1, {0xF8} },
-+
-+	{0xE0, 1, {0x04} },
-+	{0x2D, 1, {0x03} },
-+	{0xE0, 1, {0x00} },
-+
-+	{0x70, 1, {0x10} },
-+	{0x71, 1, {0x13} },
-+	{0x72, 1, {0x06} },
-+	{0x75, 1, {0x03} },
-+	{0x80, 1, {0x03} },
-+
-+	{0xE0, 1, {0x01} },
-+
-+	{0x00, 1, {0x00} },
-+	{0x01, 1, {0xB5} },
-+	{0x03, 1, {0x00} },
-+	{0x04, 1, {0xA0} },
-+
-+	{0x0A, 1, {0x07} },
-+	{0x0C, 1, {0x74} },
-+
-+	{0x17, 1, {0x00} },
-+	{0x18, 1, {0xD7} },
-+	{0x19, 1, {0x01} },
-+	{0x1A, 1, {0x00} },
-+	{0x1B, 1, {0xD7} },
-+	{0x1C, 1, {0x01} },
-+
-+	{0x1F, 1, {0x74} },
-+	{0x20, 1, {0x19} },
-+	{0x21, 1, {0x19} },
-+	{0x22, 1, {0x0E} },
-+	{0x27, 1, {0x43} },
-+
-+	{0x37, 1, {0x09} },
-+	{0x38, 1, {0x04} },
-+	{0x39, 1, {0x08} },
-+	{0x3A, 1, {0x18} },
-+	{0x3B, 1, {0x18} },
-+	{0x3C, 1, {0x72} },
-+	{0x3E, 1, {0xFF} },
-+	{0x3E, 1, {0xFF} },
-+	{0x3F, 1, {0xFF} },
-+
-+	{0x40, 1, {0x04} },
-+	{0x41, 1, {0xA0} },
-+
-+	{0x43, 1, {0x08} },
-+	{0x44, 1, {0x07} },
-+	{0x45, 1, {0x30} },
-+
-+	{0x55, 1, {0x01} },
-+	{0x56, 1, {0x01} },
-+	{0x57, 1, {0x65} },
-+	{0x58, 1, {0x0A} },
-+	{0x59, 1, {0x0A} },
-+	{0x5A, 1, {0x28} },
-+	{0x5B, 1, {0x0F} },
-+
-+	{0x5D, 1, {0x7C} },
-+	{0x5E, 1, {0x5F} },
-+	{0x5F, 1, {0x4D} },
-+	{0x60, 1, {0x3F} },
-+	{0x61, 1, {0x39} },
-+	{0x62, 1, {0x29} },
-+	{0x63, 1, {0x2B} },
-+	{0x64, 1, {0x12} },
-+	{0x65, 1, {0x28} },
-+	{0x66, 1, {0x24} },
-+	{0x67, 1, {0x22} },
-+	{0x68, 1, {0x3E} },
-+	{0x69, 1, {0x2C} },
-+	{0x6A, 1, {0x33} },
-+	{0x6B, 1, {0x26} },
-+	{0x6C, 1, {0x23} },
-+	{0x6D, 1, {0x18} },
-+	{0x6E, 1, {0x09} },
-+	{0x6F, 1, {0x00} },
-+
-+	{0x70, 1, {0x7C} },
-+	{0x71, 1, {0x5F} },
-+	{0x72, 1, {0x4D} },
-+	{0x73, 1, {0x3F} },
-+	{0x74, 1, {0x39} },
-+	{0x75, 1, {0x29} },
-+	{0x76, 1, {0x2B} },
-+	{0x77, 1, {0x12} },
-+	{0x78, 1, {0x28} },
-+	{0x79, 1, {0x24} },
-+	{0x7A, 1, {0x22} },
-+	{0x7B, 1, {0x3E} },
-+	{0x7C, 1, {0x2C} },
-+	{0x7D, 1, {0x33} },
-+	{0x7E, 1, {0x26} },
-+	{0x7F, 1, {0x23} },
-+	{0x80, 1, {0x18} },
-+	{0x81, 1, {0x09} },
-+	{0x82, 1, {0x00} },
-+
-+	{0xE0, 1, {0x02} },
-+	{0x00, 1, {0x37} },
-+	{0x01, 1, {0x17} },
-+	{0x02, 1, {0x0A} },
-+	{0x03, 1, {0x06} },
-+	{0x04, 1, {0x08} },
-+	{0x05, 1, {0x04} },
-+	{0x06, 1, {0x00} },
-+	{0x07, 1, {0x1F} },
-+	{0x08, 1, {0x1F} },
-+	{0x09, 1, {0x1F} },
-+	{0x0A, 1, {0x1F} },
-+	{0x0B, 1, {0x1F} },
-+	{0x0C, 1, {0x1F} },
-+	{0x0D, 1, {0x1F} },
-+	{0x0E, 1, {0x1F} },
-+	{0x0F, 1, {0x1F} },
-+	{0x10, 1, {0x3F} },
-+	{0x11, 1, {0x1F} },
-+	{0x12, 1, {0x1F} },
-+	{0x13, 1, {0x1E} },
-+	{0x14, 1, {0x10} },
-+	{0x15, 1, {0x1F} },
-+
-+	{0x16, 1, {0x37} },
-+	{0x17, 1, {0x17} },
-+	{0x18, 1, {0x0B} },
-+	{0x19, 1, {0x07} },
-+	{0x1A, 1, {0x09} },
-+	{0x1B, 1, {0x05} },
-+	{0x1C, 1, {0x01} },
-+	{0x1D, 1, {0x1F} },
-+	{0x1E, 1, {0x1F} },
-+	{0x1F, 1, {0x1F} },
-+	{0x20, 1, {0x1F} },
-+	{0x21, 1, {0x1F} },
-+	{0x22, 1, {0x1F} },
-+	{0x23, 1, {0x1F} },
-+	{0x24, 1, {0x1F} },
-+	{0x25, 1, {0x1F} },
-+	{0x26, 1, {0x1F} },
-+	{0x27, 1, {0x1F} },
-+	{0x28, 1, {0x1F} },
-+	{0x29, 1, {0x1E} },
-+	{0x2A, 1, {0x11} },
-+	{0x2B, 1, {0x1F} },
-+
-+	{0x2C, 1, {0x37} },
-+	{0x2D, 1, {0x17} },
-+	{0x2E, 1, {0x05} },
-+	{0x2F, 1, {0x09} },
-+	{0x30, 1, {0x07} },
-+	{0x31, 1, {0x0B} },
-+	{0x32, 1, {0x11} },
-+	{0x33, 1, {0x1F} },
-+	{0x34, 1, {0x1F} },
-+	{0x35, 1, {0x1F} },
-+	{0x36, 1, {0x1F} },
-+	{0x37, 1, {0x1F} },
-+	{0x38, 1, {0x1F} },
-+	{0x39, 1, {0x1F} },
-+	{0x3A, 1, {0x1F} },
-+	{0x3B, 1, {0x1F} },
-+	{0x3C, 1, {0x3F} },
-+	{0x3D, 1, {0x1F} },
-+	{0x3E, 1, {0x1E} },
-+	{0x3F, 1, {0x1F} },
-+	{0x40, 1, {0x01} },
-+	{0x41, 1, {0x1F} },
-+
-+	{0x42, 1, {0x38} },
-+	{0x43, 1, {0x18} },
-+	{0x44, 1, {0x04} },
-+	{0x45, 1, {0x08} },
-+	{0x46, 1, {0x06} },
-+	{0x47, 1, {0x0A} },
-+	{0x48, 1, {0x10} },
-+	{0x49, 1, {0x1F} },
-+	{0x4A, 1, {0x1F} },
-+	{0x4B, 1, {0x1F} },
-+	{0x4C, 1, {0x1F} },
-+	{0x4D, 1, {0x1F} },
-+	{0x4E, 1, {0x1F} },
-+	{0x4F, 1, {0x1F} },
-+	{0x50, 1, {0x1F} },
-+	{0x51, 1, {0x1F} },
-+	{0x52, 1, {0x1F} },
-+	{0x53, 1, {0x1F} },
-+	{0x54, 1, {0x1E} },
-+	{0x55, 1, {0x1F} },
-+	{0x56, 1, {0x00} },
-+	{0x57, 1, {0x1F} },
-+
-+	{0x58, 1, {0x10} },
-+	{0x59, 1, {0x00} },
-+	{0x5A, 1, {0x00} },
-+	{0x5B, 1, {0x10} },
-+	{0x5C, 1, {0x01} },
-+	{0x5D, 1, {0x50} },
-+	{0x5E, 1, {0x01} },
-+	{0x5F, 1, {0x02} },
-+	{0x60, 1, {0x30} },
-+	{0x61, 1, {0x01} },
-+	{0x62, 1, {0x02} },
-+	{0x63, 1, {0x06} },
-+	{0x64, 1, {0x6A} },
-+	{0x65, 1, {0x55} },
-+	{0x66, 1, {0x08} },
-+	{0x67, 1, {0x73} },
-+	{0x68, 1, {0x05} },
-+	{0x69, 1, {0x08} },
-+	{0x6A, 1, {0x6E} },
-+	{0x6B, 1, {0x00} },
-+	{0x6C, 1, {0x00} },
-+	{0x6D, 1, {0x00} },
-+	{0x6E, 1, {0x00} },
-+	{0x6F, 1, {0x88} },
-+	{0x70, 1, {0x00} },
-+	{0x71, 1, {0x00} },
-+	{0x72, 1, {0x06} },
-+	{0x73, 1, {0x7B} },
-+	{0x74, 1, {0x00} },
-+	{0x75, 1, {0x80} },
-+	{0x76, 1, {0x00} },
-+	{0x77, 1, {0x0D} },
-+	{0x78, 1, {0x18} },
-+	{0x79, 1, {0x00} },
-+	{0x7A, 1, {0x00} },
-+	{0x7B, 1, {0x00} },
-+	{0x7C, 1, {0x00} },
-+	{0x7D, 1, {0x03} },
-+	{0x7E, 1, {0x7B} },
-+	{0xE0, 1, {0x04} },
-+	{0x04, 1, {0x01} },
-+	{0x0E, 1, {0x38} },
-+	{0x2B, 1, {0x2B} },
-+	{0x2E, 1, {0x44} },
-+	{0xE0, 1, {0x00} },
-+	{0xE6, 1, {0x02} },
-+	{0xE6, 1, {0x02} },
-+
-+	{0x11, 0, {} },
-+	{REGFLAG_DELAY, 20, {} },
-+	{0x29, 0, {} },
-+	{REGFLAG_DELAY, 5, {} },
-+
-+	{0x35, 1, {0x00} },
-+	{REGFLAG_END_OF_TABLE, 0x00, {} }
-+};
-+
-+static void dsi_send_cmdq_tinno(unsigned int cmd, unsigned char count,
-+	unsigned char *para_list, unsigned char force_update)
-+{
-+	unsigned int item[16];
-+	unsigned char dsi_cmd = (unsigned char)cmd;
-+	unsigned char dc;
-+	int index = 0, length = 0;
-+
-+	memset(item, 0, sizeof(item));
-+	if (count + 1 > 60)
-+		return;
-+
-+	if (count == 0) {
-+		item[0] = 0x0500 | (dsi_cmd << 16);
-+		length = 1;
-+	} else if (count == 1) {
-+		item[0] = 0x1500 | (dsi_cmd << 16) | (para_list[0] << 24);
-+		length = 1;
-+	} else {
-+		/* Count include command. */
-+		item[0] = 0x3902 | ((count + 1) << 16);
-+		++length;
-+		while (1) {
-+			if (index == count + 1)
-+				break;
-+			if (index == 0)
-+				dc = cmd;
-+			else
-+				dc = para_list[index - 1];
-+			/* an item make up of 4data. */
-+			item[index / 4 + 1] |= (dc << (8 * (index % 4)));
-+			if (index % 4 == 0)
-+				++length;
-+			++index;
-+		}
-+	}
-+
-+	dsi_set_cmdq(item, length, force_update);
-+}
-+
-+
-+static void push_table(struct LCM_setting_table *table, unsigned int count,
-+		       unsigned char force_update)
-+{
-+	unsigned int i;
-+	unsigned int cmd;
-+
-+	for (i = 0; i < count; i++) {
-+		cmd = table[i].cmd;
-+		switch (cmd) {
-+		case REGFLAG_DELAY:
-+			MDELAY(table[i].count);
-+			break;
-+
-+		case REGFLAG_END_OF_TABLE:
-+			break;
-+
-+		default:
-+			dsi_send_cmdq_tinno(cmd, table[i].count,
-+				table[i].para_list, force_update);
-+			/* dsi_set_cmdq_V2(cmd, table[i].count,
-+			 *	table[i].para_list, force_update);
-+			 */
-+		}
-+	}
-+}
-+
-+static void init_lcm_registers(void)
-+{
-+	push_table(lcm_initialization_setting,
-+		   sizeof(lcm_initialization_setting) /
-+		   sizeof(struct LCM_setting_table), 1);
-+}
-+
-+/* ------------------------------------------------------------------- */
-+/* LCM Driver Implementations */
-+/* ------------------------------------------------------------------- */
-+static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
-+{
-+	memcpy(&lcm_util, util, sizeof(struct LCM_UTIL_FUNCS));
-+}
-+
-+static void lcm_get_params(struct LCM_PARAMS *params)
-+{
-+	memset(params, 0, sizeof(struct LCM_PARAMS));
-+
-+	params->type = LCM_TYPE_DSI;
-+
-+	params->width = FRAME_WIDTH;
-+	params->height = FRAME_HEIGHT;
-+	params->density = 213;
-+#if (LCM_DSI_CMD_MODE)
-+	params->dsi.mode = CMD_MODE;
-+#else
-+	params->dsi.mode = SYNC_PULSE_VDO_MODE;
-+#endif
-+
-+	/* DSI */
-+	/* Command mode setting */
-+	params->dsi.LANE_NUM = LCM_FOUR_LANE;
-+	/* The following defined the fomat for data coming from LCD engine. */
-+	params->dsi.data_format.color_order = LCM_COLOR_ORDER_RGB;
-+	params->dsi.data_format.trans_seq = LCM_DSI_TRANS_SEQ_MSB_FIRST;
-+	params->dsi.data_format.padding = LCM_DSI_PADDING_ON_LSB;
-+	params->dsi.data_format.format = LCM_DSI_FORMAT_RGB888;
-+
-+	params->dsi.intermediat_buffer_num = 2;
-+	params->dsi.PS = LCM_PACKED_PS_24BIT_RGB888;
-+
-+#ifdef BUILD_LK
-+	params->dsi.esd_check_enable = 1;
-+	params->dsi.customization_esd_check_enable = 1;
-+	params->dsi.lcm_esd_check_table[0].cmd = 0x0A;
-+	params->dsi.lcm_esd_check_table[0].count = 1;
-+	params->dsi.lcm_esd_check_table[0].para_list[0] = 0x9c;
-+#endif
-+	params->dsi.vertical_sync_active = 4;
-+	params->dsi.vertical_backporch = 4;
-+	params->dsi.vertical_frontporch = 16;
-+	params->dsi.vertical_active_line = FRAME_HEIGHT;
-+
-+	params->dsi.horizontal_sync_active = 55;
-+	params->dsi.horizontal_backporch = 53;
-+	params->dsi.horizontal_frontporch = 24;
-+	params->dsi.horizontal_active_pixel = FRAME_WIDTH;
-+
-+	/* video mode timing */
-+	params->dsi.word_count = FRAME_WIDTH * 3;
-+
-+	params->dsi.PLL_CLOCK = 200; /* 270 */
-+}
-+
-+static void lcm_init_lcm(void)
-+{
-+#ifdef BUILD_LK
-+	printf("[LK/LCM] lcm_init() enter\n");
-+
-+	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ONE);
-+	MDELAY(20);
-+
-+	lcm_set_gpio_output(GPIO_LCD_PWR_EN, GPIO_OUT_ONE);
-+	MDELAY(20);
-+
-+	lcm_set_gpio_output(GPIO_LCD_BIAS_ENP, GPIO_OUT_ONE);
-+	MDELAY(20);
-+
-+	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ZERO);
-+	MDELAY(10);
-+
-+	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ONE);
-+	MDELAY(10);
-+
-+	lcm_set_gpio_output(GPIO_LCM_RST, GPIO_OUT_ZERO);
-+	MDELAY(120);
-+
-+	init_lcm_registers();
-+#else
-+	pr_notice("[Kernel/LCM] lcm_init() enter\n");
-+
-+	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ONE);
-+	MDELAY(20);
-+
-+	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ONE);
-+#endif
-+}
-+
-+void lcm_suspend(void)
-+{
-+#ifndef BUILD_LK
-+	pr_notice("[Kernel/LCM] %s enter\n", __func__);
-+
-+	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
-+	MDELAY(5);
-+
-+	push_table(lcm_suspend_setting,
-+		   sizeof(lcm_suspend_setting) /
-+		   sizeof(struct LCM_setting_table), 1);
-+
-+	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ZERO);
-+	MDELAY(10);
-+
-+	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ZERO);
-+#endif
-+}
-+
-+void lcm_resume(void)
-+{
-+#ifndef BUILD_LK
-+	pr_notice("[Kernel/LCM] %s enter\n", __func__);
-+
-+	lcm_set_gpio_output(LCD_PWR_EN_PIN, GPIO_OUT_ONE);
-+	MDELAY(5);
-+
-+	lcm_set_gpio_output(LCD_PWR_BIAS_ENP_PIN, GPIO_OUT_ONE);
-+	MDELAY(5);
-+
-+	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
-+	MDELAY(10);
-+
-+	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ONE);
-+	MDELAY(10);
-+
-+	lcm_set_gpio_output(LCD_RST_PIN, GPIO_OUT_ZERO);
-+	MDELAY(10);
-+
-+	init_lcm_registers();
-+#endif
-+}
-+
-+#if (LCM_DSI_CMD_MODE)
-+static void lcm_update(unsigned int x, unsigned int y,
-+		unsigned int width, unsigned int height)
-+{
-+	unsigned int x0 = x;
-+	unsigned int y0 = y;
-+	unsigned int x1 = x0 + width - 1;
-+	unsigned int y1 = y0 + height - 1;
-+
-+	unsigned char x0_MSB = ((x0 >> 8) & 0xFF);
-+	unsigned char x0_LSB = (x0 & 0xFF);
-+	unsigned char x1_MSB = ((x1 >> 8) & 0xFF);
-+	unsigned char x1_LSB = (x1 & 0xFF);
-+	unsigned char y0_MSB = ((y0 >> 8) & 0xFF);
-+	unsigned char y0_LSB = (y0 & 0xFF);
-+	unsigned char y1_MSB = ((y1 >> 8) & 0xFF);
-+	unsigned char y1_LSB = (y1 & 0xFF);
-+
-+	unsigned int data_array[16];
-+
-+	data_array[0] = 0x00053902;
-+	data_array[1] = (x1_MSB << 24) | (x0_LSB << 16) | (x0_MSB << 8) | 0x2a;
-+	data_array[2] = (x1_LSB);
-+	dsi_set_cmdq(data_array, 3, 1);
-+
-+	data_array[0] = 0x00053902;
-+	data_array[1] = (y1_MSB << 24) | (y0_LSB << 16) | (y0_MSB << 8) | 0x2b;
-+	data_array[2] = (y1_LSB);
-+	dsi_set_cmdq(data_array, 3, 1);
-+
-+	data_array[0] = 0x002c3909;
-+	dsi_set_cmdq(data_array, 1, 0);
-+}
-+#endif
-+
-+struct LCM_DRIVER hx8394d_hd480_dsi_vdo_lcm_drv = {
-+	.name = "hx8394d_hd480_dsi_vdo",
-+	.set_util_funcs = lcm_set_util_funcs,
-+	.get_params = lcm_get_params,
-+	.init = lcm_init_lcm,
-+	.suspend = lcm_suspend,
-+	.resume = lcm_resume,
-+};
 diff --git a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c b/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c
 index e58ffa50f..aeff467a3 100644
 --- a/drivers/misc/mediatek/lcm/mt65xx_lcm_list.c
@@ -1561,6 +1089,102 @@ index 4eae6c6f3..3cf4ed6a9 100644
  ifdef CONFIG_LEDS_MTK_DISP
  obj-$(CONFIG_LEDS_MTK_DISP)		+= leds-mtk-disp.o
  else ifdef CONFIG_LEDS_MTK_PWM
+diff --git a/drivers/misc/mediatek/leds/mt6768/ktd3136_bl.c b/drivers/misc/mediatek/leds/mt6768/ktd3136_bl.c
+index 9c136b2c6..1df4ad591 100644
+--- a/drivers/misc/mediatek/leds/mt6768/ktd3136_bl.c
++++ b/drivers/misc/mediatek/leds/mt6768/ktd3136_bl.c
+@@ -1037,9 +1037,11 @@ static int ktd3137_probe(struct i2c_client *client,
+ 	//struct device_node *np = client->dev.of_node;
+ 	extern char *saved_command_line;
+ 	int bkl_id = 0;
+-	char *bkl_ptr = (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line));
+-	bkl_ptr += strlen(":bklic=");
+-	bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	char *bkl_ptr = saved_command_line ? (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line)) : NULL;
++	if (bkl_ptr) {
++		bkl_ptr += strlen(":bklic=");
++		bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	}
+ 	LOG_DBG("[%s]: *liuyundong*, ----bkl_id = %d-----\n", __func__, bkl_id);
+ 
+ 	if (bkl_id != 24) {
+diff --git a/drivers/misc/mediatek/leds/mt6768/mtk_leds.c b/drivers/misc/mediatek/leds/mt6768/mtk_leds.c
+index a7251282f..03f36c227 100644
+--- a/drivers/misc/mediatek/leds/mt6768/mtk_leds.c
++++ b/drivers/misc/mediatek/leds/mt6768/mtk_leds.c
+@@ -169,9 +169,11 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
+ 
+ 	extern char *saved_command_line;
+ 	int bkl_id = 0;
+-	char *bkl_ptr = (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line));
+-	bkl_ptr += strlen(":bklic=");
+-	bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	char *bkl_ptr = saved_command_line ? (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line)) : NULL;
++	if (bkl_ptr) {
++		bkl_ptr += strlen(":bklic=");
++		bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	}
+ 
+ 	if (pled_dtsi)
+ 		goto out;
+diff --git a/drivers/misc/mediatek/log_store/log_store.c b/drivers/misc/mediatek/log_store/log_store.c
+index f6629cae0..129932fc9 100644
+--- a/drivers/misc/mediatek/log_store/log_store.c
++++ b/drivers/misc/mediatek/log_store/log_store.c
+@@ -69,7 +69,7 @@ u32 get_pmic_boot_phase(void)
+ void store_log_to_emmc_enable(bool value)
+ {
+ 
+-	if (!sram_dram_buff) {
++	if (!sram_dram_buff || !sram_header) {
+ 		pr_notice("%s: sram dram buff is NULL.\n", __func__);
+ 		return;
+ 	}
+@@ -95,6 +95,9 @@ void set_boot_phase(u32 step)
+ 	int file_size = 0;
+ 	struct log_emmc_header pEmmc;
+ 
++	if (!sram_header || !sram_dram_buff)
++		return;
++
+ #ifdef CONFIG_MTK_PMIC_COMMON
+ 	if (sram_header->reserve[SRAM_PMIC_BOOT_PHASE] == FLAG_ENABLE) {
+ 		set_pmic_boot_phase(step);
+@@ -524,8 +527,9 @@ static int __init dt_get_log_store(unsigned long node, const char *uname,
+ 		pr_notice("log_store:[DT] log_store: 0x%x@0x%x\n",
+ 				sram_ls->addr, sram_ls->size);
+ 		*(struct mem_desc_ls *) data = *sram_ls;
++		return 1;
+ 	}
+-	return 1;
++	return 0;
+ }
+ /* store log_store information to */
+ static int __init log_store_early_init(void)
+@@ -534,14 +538,20 @@ static int __init log_store_early_init(void)
+ #if IS_ENABLED(CONFIG_MTK_DRAM_LOG_STORE)
+ 	struct mem_desc_ls sram_ls = { 0 };
+ 
+-	if (of_scan_flat_dt(dt_get_log_store, &sram_ls))
++	if (of_scan_flat_dt(dt_get_log_store, &sram_ls) && sram_ls.addr != 0) {
+ 		pr_info("log_store: get ok, sram addr:0x%x, size:0x%x\n",
+ 				sram_ls.addr, sram_ls.size);
+-	else
+-		pr_info("log_store: get fail\n");
++	} else {
++		pr_info("log_store: get fail, disabling log_store\n");
++		return -ENODEV;
++	}
+ 
+ 	sram_header = ioremap_wc(sram_ls.addr,
+ 		CONFIG_MTK_DRAM_LOG_STORE_SIZE);
++	if (!sram_header) {
++		pr_info("log_store: ioremap_wc failed\n");
++		return -ENODEV;
++	}
+ 	dram_curlog_header = &(sram_header->dram_curlog_header);
+ #else
+ 	pr_notice("log_store: not Found CONFIG_MTK_DRAM_LOG_STORE!\n");
 diff --git a/drivers/misc/mediatek/m4u/mt6768/Makefile b/drivers/misc/mediatek/m4u/mt6768/Makefile
 index ceb87bd45..b18bb4a62 100644
 --- a/drivers/misc/mediatek/m4u/mt6768/Makefile
@@ -1833,6 +1457,62 @@ index 65c661eed..3ec0a06e5 100644
  subdir-ccflags-$(CONFIG_USB_MTK_HDRC) += -I$(srctree)/drivers/misc/mediatek/usb20/
  subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/u3_switch
  subdir-ccflags-$(CONFIG_USB_C_SWITCH_U3_MUX) += -I$(srctree)/drivers/misc/mediatek/usb_c/inc
+diff --git a/drivers/misc/mediatek/ram_console/mtk_ram_console.c b/drivers/misc/mediatek/ram_console/mtk_ram_console.c
+index 66842555b..23cb7d74b 100644
+--- a/drivers/misc/mediatek/ram_console/mtk_ram_console.c
++++ b/drivers/misc/mediatek/ram_console/mtk_ram_console.c
+@@ -694,7 +694,7 @@ struct ram_console_memory_info {
+ static void ram_console_fatal(const char *str)
+ {
+ 	pr_err("ram_console: FATAL:%s\n", str);
+-	BUG();
++	WARN_ON(1);
+ }
+ 
+ void __weak pstore_set_addr_size(unsigned int addr, unsigned int size,
+@@ -825,8 +825,8 @@ static int __init ram_console_early_init(void)
+ 			ram_console_fatal("ioremap failed");
+ 		}
+ 	} else {
+-		pr_err("ram_console: of_scan_flat_dt failed\n");
+-		ram_console_fatal("of_scan_flat_dt failed");
++		pr_warn("ram_console: of_scan_flat_dt failed, disabling ram_console\n");
++		return -ENODEV;
+ 	}
+ #else
+ #error "CONFIG_OF NOT defined"
+diff --git a/drivers/misc/mediatek/scp/mt6768/scp_dvfs.c b/drivers/misc/mediatek/scp/mt6768/scp_dvfs.c
+index c48c53eda..93a59b1f2 100644
+--- a/drivers/misc/mediatek/scp/mt6768/scp_dvfs.c
++++ b/drivers/misc/mediatek/scp/mt6768/scp_dvfs.c
+@@ -324,6 +324,7 @@ void wait_scp_dvfs_init_done(void)
+ 		if (count > 3000) {
+ 			pr_err("SCP dvfs driver init fail\n");
+ 			WARN_ON(1);
++			break;
+ 		}
+ 	}
+ }
+@@ -332,6 +333,9 @@ void scp_pll_mux_set(unsigned int pll_ctrl_flag)
+ {
+ 	int ret = 0;
+ 
++	if (!mt_scp_pll)
++		return;
++
+ 	pr_debug("%s(%d)\n\n", __func__, pll_ctrl_flag);
+ 
+ 	if (pll_ctrl_flag == PLL_ENABLE) {
+@@ -348,6 +352,9 @@ int scp_pll_ctrl_set(unsigned int pll_ctrl_flag, unsigned int pll_sel)
+ {
+ 	int ret = 0;
+ 
++	if (!mt_scp_pll)
++		return 0;
++
+ 	pr_debug("%s(%d, %d)\n", __func__, pll_ctrl_flag, pll_sel);
+ 
+ 	if (pll_ctrl_flag == PLL_ENABLE) {
 diff --git a/drivers/misc/mediatek/smi/Makefile b/drivers/misc/mediatek/smi/Makefile
 index 5e2af4422..4372dca62 100644
 --- a/drivers/misc/mediatek/smi/Makefile
@@ -1849,6 +1529,82 @@ index 5e2af4422..4372dca62 100644
  ccflags-y += -I$(srctree)/drivers/clk/mediatek/
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v3/$(MTK_PLATFORM)/
+diff --git a/drivers/misc/mediatek/smi/smi_drv.c b/drivers/misc/mediatek/smi/smi_drv.c
+index b6ae4305d..06d3b7880 100644
+--- a/drivers/misc/mediatek/smi/smi_drv.c
++++ b/drivers/misc/mediatek/smi/smi_drv.c
+@@ -1180,13 +1180,22 @@ s32 smi_register(void)
+ 	smi_drv.table[smi_drv.scen] += 1;
+ 
+ 	/* mmsys */
++	if (!smi_dev[SMI_LARB_NUM] || !smi_dev[SMI_LARB_NUM]->dev || !smi_dev[SMI_LARB_NUM]->dev->of_node) {
++		SMIERR("smi_dev not available, skipping smi_register\n");
++		return 0;
++	}
+ 	smi_conf_get(SMI_LARB_NUM);
+ 	of_node = of_parse_phandle(
+ 		smi_dev[SMI_LARB_NUM]->dev->of_node, "mmsys_config", 0);
++	if (!of_node) {
++		SMIERR("Unable to parse mmsys_config\n");
++		return 0;
++	}
+ 	smi_mmsys_base = (void *)of_iomap(of_node, 0);
+ 	if (!smi_mmsys_base) {
+ 		SMIERR("Unable to parse or iomap mmsys_config\n");
+-		return -ENOMEM;
++		of_node_put(of_node);
++		return 0;
+ 	}
+ 	if (of_address_to_resource(of_node, 0, &res))
+ 		return -EINVAL;
+diff --git a/drivers/misc/mediatek/sspm/v1/sspm_helper.c b/drivers/misc/mediatek/sspm/v1/sspm_helper.c
+index 60280d6e0..0682a10d8 100644
+--- a/drivers/misc/mediatek/sspm/v1/sspm_helper.c
++++ b/drivers/misc/mediatek/sspm/v1/sspm_helper.c
+@@ -63,6 +63,9 @@ void memcpy_to_sspm(void __iomem *trg, const void *src, int size)
+ 	u32 __iomem *t = trg;
+ 	const u32 *s = src;
+ 
++	if (!trg || !src)
++		return;
++
+ 	len = (size + 3) >> 2;
+ 
+ 	for (i = 0; i < len; i++)
+@@ -76,6 +79,9 @@ void memcpy_from_sspm(void *trg, const void __iomem *src, int size)
+ 	u32 *t = trg;
+ 	const u32 __iomem *s = src;
+ 
++	if (!trg || !src)
++		return;
++
+ 	len = (size + 3) >> 2;
+ 
+ 	for (i = 0; i < len; i++)
+diff --git a/drivers/misc/mediatek/sspm/v1/sspm_mbox.c b/drivers/misc/mediatek/sspm/v1/sspm_mbox.c
+index b783c6551..031b0f272 100644
+--- a/drivers/misc/mediatek/sspm/v1/sspm_mbox.c
++++ b/drivers/misc/mediatek/sspm/v1/sspm_mbox.c
+@@ -61,6 +61,9 @@ int sspm_mbox_read(unsigned int mbox, unsigned int slot, void *data,
+ {
+ 	struct sspm_mbox *desc = &sspmmbox[mbox];
+ 
++	if (!desc->base)
++		return -ENODEV;
++
+ 	if (data)
+ 		memcpy_from_sspm(data, desc->base + (SSPM_MBOX_SLOT_SIZE * slot)
+ 				, SSPM_MBOX_SLOT_SIZE*len);
+@@ -73,6 +76,9 @@ int sspm_mbox_write(unsigned int mbox, unsigned int slot, void *data,
+ {
+ 	struct sspm_mbox *desc = &sspmmbox[mbox];
+ 
++	if (!desc->base)
++		return -ENODEV;
++
+ 	if (data)
+ 		memcpy_to_sspm(desc->base + (SSPM_MBOX_SLOT_SIZE * slot), data,
+ 				len * SSPM_MBOX_SLOT_SIZE);
 diff --git a/drivers/misc/mediatek/teei/300/tz_dcih/Makefile b/drivers/misc/mediatek/teei/300/tz_dcih/Makefile
 index 53f906632..2895c34f4 100644
 --- a/drivers/misc/mediatek/teei/300/tz_dcih/Makefile
@@ -1869,6 +1625,59 @@ index f38b19596..80aab9fe1 100644
  obj-y += ut_tester.o
 -ccflags-y += -Werror
 +ccflags-y += 
+diff --git a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_blk_ntc.c b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_blk_ntc.c
+index e929b6176..3f490582d 100644
+--- a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_blk_ntc.c
++++ b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_blk_ntc.c
+@@ -593,6 +593,9 @@ static int get_hw_bts_temp(void)
+ 	int ret_temp = 0;
+ #endif
+ 
++	if (IS_ERR_OR_NULL(channel))
++		return 25;
++
+ 	i = times;
+ 	while (i--) {
+ 		ret_value = iio_read_channel_processed(channel, &auxadc_voltage);
+diff --git a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_bts.c b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_bts.c
+index b007ae8bf..60ab81883 100644
+--- a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_bts.c
++++ b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_bts.c
+@@ -625,6 +625,8 @@ static int get_hw_bts_temp(void)
+ #endif
+ 
+ #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
++	if (IS_ERR_OR_NULL(thermistor_ch0))
++		return 25;
+ 	ret = iio_read_channel_processed(thermistor_ch0, &val);
+ 	if (ret < 0) {
+ 		mtkts_bts_printk("Busy/Timeout, IIO ch read failed %d\n", ret);
+diff --git a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsmdpa.c b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsmdpa.c
+index a402fd4f1..81a027d7e 100644
+--- a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsmdpa.c
++++ b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsmdpa.c
+@@ -620,6 +620,8 @@ static int get_hw_btsmdpa_temp(void)
+ #endif
+ 
+ #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
++	if (IS_ERR_OR_NULL(thermistor_ch1))
++		return 25;
+ 	ret = iio_read_channel_processed(thermistor_ch1, &val);
+ 	mtkts_btsmdpa_dprintk("get_hw_btsmdpa_temp val=%d\n", val);
+ 
+diff --git a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsnrpa.c b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsnrpa.c
+index d40529cd5..9f5f85e57 100644
+--- a/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsnrpa.c
++++ b/drivers/misc/mediatek/thermal/common/thermal_zones/mtk_ts_btsnrpa.c
+@@ -619,6 +619,8 @@ static int get_hw_btsnrpa_temp(void)
+ #endif
+ 
+ #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
++	if (IS_ERR_OR_NULL(thermistor_ch2))
++		return 25;
+ 	ret = iio_read_channel_processed(thermistor_ch2, &val);
+ 	mtkts_btsnrpa_dprintk("%s val=%d\n", __func__, val);
+ 
 diff --git a/drivers/misc/mediatek/timer/timesync/Makefile b/drivers/misc/mediatek/timer/timesync/Makefile
 index c208a9946..abdcc62d9 100644
 --- a/drivers/misc/mediatek/timer/timesync/Makefile
@@ -1947,6 +1756,186 @@ index e505a8a7f..64b3b3eda 100644
  
  /* ESD RECOVERY */
  int primary_display_esd_recovery(void)
+diff --git a/drivers/misc/mediatek/video/mt6768/videox/mtk_disp_mgr.c b/drivers/misc/mediatek/video/mt6768/videox/mtk_disp_mgr.c
+index f9c9746ad..0fe5c8074 100644
+--- a/drivers/misc/mediatek/video/mt6768/videox/mtk_disp_mgr.c
++++ b/drivers/misc/mediatek/video/mt6768/videox/mtk_disp_mgr.c
+@@ -1166,63 +1166,64 @@ int _ioctl_get_is_driver_suspend(unsigned long arg)
+ 	return ret;
+ }
+ 
+-int _ioctl_get_display_caps(unsigned long arg)
++int _ioctl_get_display_caps(unsigned int cmd, unsigned long arg)
+ {
+ 	int ret = 0;
+-	struct disp_caps_info caps_info;
++	char buffer[256];
++	struct disp_caps_info *caps_info = (struct disp_caps_info *)buffer;
+ 	void __user *argp = (void __user *)arg;
++	size_t copy_len = _IOC_SIZE(cmd);
+ 
+-	if (copy_from_user(&caps_info, argp, sizeof(caps_info))) {
+-		DISPERR("[FB]: copy_from_user failed! line:%d\n", __LINE__);
+-		ret = -EFAULT;
+-	}
+-	memset(&caps_info, 0, sizeof(caps_info));
++	if (copy_len == 0 || copy_len > sizeof(buffer))
++		copy_len = 164;
++
++	memset(buffer, 0, sizeof(buffer));
+ #ifdef DISP_HW_MODE_CAP
+-	caps_info.output_mode = DISP_HW_MODE_CAP;
++	caps_info->output_mode = DISP_HW_MODE_CAP;
+ #else
+-	caps_info.output_mode = DISP_OUTPUT_CAP_DIRECT_LINK;
++	caps_info->output_mode = DISP_OUTPUT_CAP_DIRECT_LINK;
+ #endif
+ 
+ #ifdef DISP_HW_PASS_MODE
+-	caps_info.output_pass = DISP_HW_PASS_MODE;
++	caps_info->output_pass = DISP_HW_PASS_MODE;
+ #else
+-	caps_info.output_pass = DISP_OUTPUT_CAP_SINGLE_PASS;
++	caps_info->output_pass = DISP_OUTPUT_CAP_SINGLE_PASS;
+ #endif
+ 
+ #ifdef DISP_HW_MAX_LAYER
+-	caps_info.max_layer_num = DISP_HW_MAX_LAYER;
++	caps_info->max_layer_num = DISP_HW_MAX_LAYER;
+ #else
+-	caps_info.max_layer_num = 4;
++	caps_info->max_layer_num = 4;
+ #endif
+-	caps_info.is_support_frame_cfg_ioctl = 1;
++	caps_info->is_support_frame_cfg_ioctl = 1;
+ 
+ #ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW
+-	caps_info.is_output_rotated = 1;
+-	caps_info.lcm_degree = 180;
++	caps_info->is_output_rotated = 1;
++	caps_info->lcm_degree = 180;
+ #endif
+ 
+ 	if (disp_partial_is_support())
+-		caps_info.disp_feature |= DISP_FEATURE_PARTIAL;
++		caps_info->disp_feature |= DISP_FEATURE_PARTIAL;
+ 
+ 	if (disp_helper_get_option(DISP_OPT_HRT))
+-		caps_info.disp_feature |= DISP_FEATURE_HRT;
++		caps_info->disp_feature |= DISP_FEATURE_HRT;
+ 
+ 	if (disp_helper_get_option(DISP_OPT_FRAME_QUEUE))
+-		caps_info.disp_feature |= DISP_FEATURE_FENCE_WAIT;
++		caps_info->disp_feature |= DISP_FEATURE_FENCE_WAIT;
+ 
+ 	if (disp_helper_get_option(DISP_OPT_RSZ))
+-		caps_info.disp_feature |= DISP_FEATURE_RSZ;
++		caps_info->disp_feature |= DISP_FEATURE_RSZ;
+ 	if (disp_helper_get_option(DISP_OPT_RPO))
+-		caps_info.disp_feature |= DISP_FEATURE_RPO;
++		caps_info->disp_feature |= DISP_FEATURE_RPO;
+ 
+ 	if (disp_helper_get_option(DISP_OPT_RSZ) ||
+ 	    disp_helper_get_option(DISP_OPT_RPO)) {
+-		caps_info.rsz_in_max[0] = RSZ_TILE_LENGTH -
++		caps_info->rsz_in_max[0] = RSZ_TILE_LENGTH -
+ 						RSZ_ALIGNMENT_MARGIN;
+-		caps_info.rsz_in_max[1] = RSZ_IN_MAX_HEIGHT;
++		caps_info->rsz_in_max[1] = RSZ_IN_MAX_HEIGHT;
+ 	}
+ 
+-	if (copy_to_user(argp, &caps_info, sizeof(caps_info))) {
++	if (copy_to_user(argp, buffer, copy_len)) {
+ 		DISPERR("[FB]: copy_to_user failed! line:%d\n",
+ 			__LINE__);
+ 		ret = -EFAULT;
+@@ -1490,6 +1491,8 @@ const char *_session_ioctl_spy(unsigned int cmd)
+ 	case DISP_IOCTL_OD_CTL:
+ 		return "DISP_IOCTL_OD_CTL";
+ 	case DISP_IOCTL_GET_DISPLAY_CAPS:
++	case 0x40a44fdb:
++	case 0x40a04fdb:
+ 		return "DISP_IOCTL_GET_DISPLAY_CAPS";
+ 	case DISP_IOCTL_QUERY_VALID_LAYER:
+ 		return "DISP_IOCTL_QUERY_VALID_LAYER";
+@@ -1532,8 +1535,10 @@ long mtk_disp_mgr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 			return _ioctl_get_info(arg);
+ 		}
+ 	case DISP_IOCTL_GET_DISPLAY_CAPS:
++	case 0x40a44fdb:
++	case 0x40a04fdb:
+ 		{
+-			return _ioctl_get_display_caps(arg);
++			return _ioctl_get_display_caps(cmd, arg);
+ 		}
+ 	case DISP_IOCTL_GET_VSYNC_FPS:
+ 		{
+diff --git a/drivers/misc/mediatek/video/mt6768/videox/mtkfb.c b/drivers/misc/mediatek/video/mt6768/videox/mtkfb.c
+index f5bea5c03..7f5c391f7 100644
+--- a/drivers/misc/mediatek/video/mt6768/videox/mtkfb.c
++++ b/drivers/misc/mediatek/video/mt6768/videox/mtkfb.c
+@@ -386,9 +386,11 @@ static ssize_t mtkfb_set_hbm(struct device *dev, struct device_attribute *attr,
+ {
+ 	extern char *saved_command_line;
+ 	int bkl_id = 0;
+-	char *bkl_ptr = (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line));
+-	bkl_ptr += strlen(":bklic=");
+-	bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	char *bkl_ptr = saved_command_line ? (char *)strnstr(saved_command_line, ":bklic=", strlen(saved_command_line)) : NULL;
++	if (bkl_ptr) {
++		bkl_ptr += strlen(":bklic=");
++		bkl_id = simple_strtol(bkl_ptr, NULL, 10);
++	}
+ 
+ 	sscanf(buf, "%d", &hbm_mode);
+ 
+@@ -2423,6 +2425,11 @@ static void mtkfb_free_resources(struct mtkfb_device *fbdev, int state)
+ 
+ void disp_get_fb_address(unsigned long *fbVirAddr, unsigned long *fbPhysAddr)
+ {
++	if (!mtkfb_fbi || !mtkfb_fbi->par) {
++		if (fbVirAddr) *fbVirAddr = 0;
++		if (fbPhysAddr) *fbPhysAddr = 0;
++		return;
++	}
+ 	struct mtkfb_device *fbdev = (struct mtkfb_device *)mtkfb_fbi->par;
+ 	int fb_size;
+ 
+@@ -3318,7 +3325,12 @@ static struct early_suspend mtkfb_early_suspend_handler = {
+ int mtkfb_get_debug_state(char *stringbuf, int buf_len)
+ {
+ 	int len = 0;
+-	struct mtkfb_device *fbdev = (struct mtkfb_device *)mtkfb_fbi->par;
++	struct mtkfb_device *fbdev;
++
++	if (!mtkfb_fbi || !mtkfb_fbi->par)
++		return 0;
++
++	fbdev = (struct mtkfb_device *)mtkfb_fbi->par;
+ 
+ 	unsigned long va = (unsigned long)fbdev->fb_va_base;
+ 	unsigned long mva = (unsigned long)fbdev->fb_pa_base;
+diff --git a/drivers/misc/mediatek/video/mt6768/videox/primary_display.c b/drivers/misc/mediatek/video/mt6768/videox/primary_display.c
+index 3d8bd7dc2..303225f90 100644
+--- a/drivers/misc/mediatek/video/mt6768/videox/primary_display.c
++++ b/drivers/misc/mediatek/video/mt6768/videox/primary_display.c
+@@ -1085,8 +1085,14 @@ static int fps_monitor_thread(void *data)
+ int primary_display_get_debug_state(char *stringbuf, int buf_len)
+ {
+ 	int len = 0;
+-	struct LCM_PARAMS *lcm_param = disp_lcm_get_params(pgc->plcm);
+-	struct LCM_DRIVER *lcm_drv = pgc->plcm->drv;
++	struct LCM_PARAMS *lcm_param;
++	struct LCM_DRIVER *lcm_drv;
++
++	if (!pgc || !pgc->plcm || !pgc->plcm->drv)
++		return 0;
++
++	lcm_param = disp_lcm_get_params(pgc->plcm);
++	lcm_drv = pgc->plcm->drv;
+ 
+ 	len += scnprintf(stringbuf + len, buf_len - len,
+ 		"|--------------------------------------------------------------------------------------|\n");
 diff --git a/drivers/mmc/host/mediatek/ComboA/Makefile b/drivers/mmc/host/mediatek/ComboA/Makefile
 index 8a2da516a..0bee5a570 100644
 --- a/drivers/mmc/host/mediatek/ComboA/Makefile
@@ -1959,6 +1948,27 @@ index 8a2da516a..0bee5a570 100644
  
  ifeq ($(CONFIG_MTK_HW_FDE_AES),y)
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/fde_aes/$(subst ",,$(CONFIG_MTK_PLATFORM))
+diff --git a/drivers/net/virtio_net.c b/drivers/net/virtio_net.c
+index 067ebdd0d..13fe0a2ef 100644
+--- a/drivers/net/virtio_net.c
++++ b/drivers/net/virtio_net.c
+@@ -2518,6 +2518,8 @@ static int virtnet_probe(struct virtio_device *vdev)
+ 	u16 max_queue_pairs;
+ 	int mtu;
+ 
++	pr_info("virtnet: probing %s\n", dev_name(&vdev->dev));
++
+ 	/* Find if host supports multiqueue virtio_net device */
+ 	err = virtio_cread_feature(vdev, VIRTIO_NET_F_MQ,
+ 				   struct virtio_net_config,
+@@ -2832,6 +2834,7 @@ static __init int virtio_net_driver_init(void)
+ {
+ 	int ret;
+ 
++	pr_info("virtnet: driver_init started\n");
+ 	ret = cpuhp_setup_state_multi(CPUHP_AP_ONLINE_DYN, "virtio/net:online",
+ 				      virtnet_cpu_online,
+ 				      virtnet_cpu_down_prep);
 diff --git a/drivers/pinctrl/mediatek/Makefile b/drivers/pinctrl/mediatek/Makefile
 index 2cfc78336..c0ebf8b8e 100644
 --- a/drivers/pinctrl/mediatek/Makefile
@@ -2415,6 +2425,40 @@ index 3055a622c..ea1e1d6c1 100644
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/dbgtop
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include/mach
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/koro/$(CONFIG_MTK_PLATFORM)/inc
+diff --git a/drivers/watchdog/mediatek/wdt/common/wdt_v2/mtk_wdt_v2.c b/drivers/watchdog/mediatek/wdt/common/wdt_v2/mtk_wdt_v2.c
+index 61c39e438..7281c0bd8 100644
+--- a/drivers/watchdog/mediatek/wdt/common/wdt_v2/mtk_wdt_v2.c
++++ b/drivers/watchdog/mediatek/wdt/common/wdt_v2/mtk_wdt_v2.c
+@@ -243,6 +243,9 @@ void mtk_wdt_mode_config(bool dual_mode_en,
+ 					bool ext_pol,
+ 					bool wdt_en)
+ {
++	if (!toprgu_base)
++		return;
++
+ 	#ifndef CONFIG_KICK_SPM_WDT
+ 	unsigned int tmp;
+ 	unsigned int non_rst2 = __raw_readl(MTK_WDT_NONRST_REG2);
+@@ -315,6 +318,9 @@ void mtk_wdt_mode_config_nolock(bool dual_mode_en,
+ 					bool ext_pol,
+ 					bool wdt_en)
+ {
++	if (!toprgu_base)
++		return;
++
+ 	#ifndef CONFIG_KICK_SPM_WDT
+ 	unsigned int tmp;
+ 	unsigned int non_rst2 = __raw_readl(MTK_WDT_NONRST_REG2);
+@@ -1092,6 +1098,9 @@ int mtk_wdt_dfd_count_en(int value)
+ {
+ 	unsigned int tmp;
+ 
++	if (!toprgu_base)
++		return 0;
++
+ 	/* dfd_count_en is obsolete, enable dfd_en only here */
+ 
+ 	if (value == 1) {
 diff --git a/fs/exec.c b/fs/exec.c
 index ae0a49517..acd97fe59 100644
 --- a/fs/exec.c
@@ -2469,6 +2513,24 @@ index 3b62683fe..081f0a619 100644
  	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
  		return -EINVAL;
  
+diff --git a/fs/pstore/platform.c b/fs/pstore/platform.c
+index d251c6150..b136730e5 100644
+--- a/fs/pstore/platform.c
++++ b/fs/pstore/platform.c
+@@ -642,7 +642,12 @@ static void pstore_simp_console_write(struct console *con, const char *s,
+ 
+ void pstore_bconsole_write(struct console *con, const char *s, unsigned int c)
+ {
+-	const char *e = s + c;
++	const char *e;
++
++	if (!psinfo || !psinfo->write)
++		return;
++
++	e = s + c;
+ 
+ 	while (s < e) {
+ 		struct pstore_record record;
 diff --git a/fs/read_write.c b/fs/read_write.c
 index 0da6e4f19..757c7c3fc 100644
 --- a/fs/read_write.c

@@ -7,12 +7,17 @@
 set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # Default paths
 KERNEL_IMG="${KERNEL_IMG:-${REPO_ROOT}/out/kernel/Image}"
 RAMDISK_IMG="${RAMDISK_IMG:-${REPO_ROOT}/out/kernel/ramdisk}"
-SYSTEM_IMG="${SYSTEM_IMG:-}"
+SYSTEM_IMG="${SYSTEM_IMG:-/home/tomasztoczek/Downloads/fw_8667_extract/partitions/system.img}"
+VENDOR_IMG="${VENDOR_IMG:-/home/tomasztoczek/Downloads/fw_8667_extract/partitions/vendor.img}"
+PRODUCT_IMG="${PRODUCT_IMG:-/home/tomasztoczek/Downloads/fw_8667_extract/partitions/product.img}"
+METADATA_IMG="${METADATA_IMG:-/tmp/metadata.img}"
+DATA_IMG="${DATA_IMG:-/tmp/userdata.img}"
+CACHE_IMG="${CACHE_IMG:-/tmp/cache.img}"
 MCU_UART_PATH="${MCU_UART_PATH:-/tmp/mcu_uart}"
 HEADLESS=0
 ADB_PORT=5555
@@ -32,6 +37,14 @@ while [[ $# -gt 0 ]]; do
             SYSTEM_IMG="$2"
             shift 2
             ;;
+        --vendor)
+            VENDOR_IMG="$2"
+            shift 2
+            ;;
+        --product)
+            PRODUCT_IMG="$2"
+            shift 2
+            ;;
         --mcu-uart)
             MCU_UART_PATH="$2"
             shift 2
@@ -49,7 +62,9 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --kernel <path>       Kernel Image file (default: out/kernel/Image)"
             echo "  --ramdisk <path>      Ramdisk cpio/gz (default: out/kernel/ramdisk)"
-            echo "  --system <path>       System / Super ext4 or raw image file"
+            echo "  --system <path>       System ext4 or raw image file"
+            echo "  --vendor <path>       Vendor ext4 or raw image file"
+            echo "  --product <path>      Product ext4 or raw image file"
             echo "  --mcu-uart <path>     Path to mock MCU PTY symlink (default: /tmp/mcu_uart)"
             echo "  --headless            Run without graphical window (VNC on :0)"
             echo "  --adb-port <port>     ADB port to forward to host (default: 5555)"
@@ -93,19 +108,21 @@ else
 fi
 
 # Kernel command line arguments
-KERNEL_CMDLINE="console=ttyAMA0 earlycon androidboot.hardware=spm8667p1_64 androidboot.selinux=permissive androidboot.boot_devices=soc/11230000.mmc init=/init ignore_loglevel"
+KERNEL_CMDLINE="console=ttyAMA0,115200 earlycon keep_bootcon loglevel=8 androidboot.hardware=mt6768 androidboot.boot_devices=pci0000:00 androidboot.selinux=permissive androidboot.adb.tcp.port=${ADB_PORT} service.adb.tcp.port=${ADB_PORT} init=/init ignore_loglevel"
 
 QEMU_ARGS=(
     qemu-system-aarch64
     -M virt,gic-version=3
     -cpu cortex-a72
-    -smp 8
+    -smp 4
     -m 4G
     -kernel "${KERNEL_IMG}"
     -append "${KERNEL_CMDLINE}"
     -serial mon:stdio
+    -monitor unix:/tmp/qemu_monitor.sock,server,nowait
     ${MCU_SERIAL_ARG}
-    -device virtio-net-pci,netdev=net0
+    -device virtio-gpu-pci,id=gpu0,xres=1280,yres=720
+    -device virtio-net-pci,netdev=net0,disable-legacy=on
     -netdev "user,id=net0,hostfwd=tcp::${ADB_PORT}-:5555"
     -device virtio-tablet-pci
     -device virtio-keyboard-pci
@@ -121,6 +138,26 @@ if [ -n "${SYSTEM_IMG}" ] && [ -f "${SYSTEM_IMG}" ]; then
     QEMU_ARGS+=(-drive "file=${SYSTEM_IMG},format=raw,if=virtio,index=0")
 fi
 
+if [ -n "${VENDOR_IMG}" ] && [ -f "${VENDOR_IMG}" ]; then
+    QEMU_ARGS+=(-drive "file=${VENDOR_IMG},format=raw,if=virtio,index=1")
+fi
+
+if [ -n "${PRODUCT_IMG}" ] && [ -f "${PRODUCT_IMG}" ]; then
+    QEMU_ARGS+=(-drive "file=${PRODUCT_IMG},format=raw,if=virtio,index=2")
+fi
+
+if [ -n "${METADATA_IMG}" ] && [ -f "${METADATA_IMG}" ]; then
+    QEMU_ARGS+=(-drive "file=${METADATA_IMG},format=raw,if=virtio,index=3")
+fi
+
+if [ -n "${DATA_IMG}" ] && [ -f "${DATA_IMG}" ]; then
+    QEMU_ARGS+=(-drive "file=${DATA_IMG},format=raw,if=virtio,index=4")
+fi
+
+if [ -n "${CACHE_IMG}" ] && [ -f "${CACHE_IMG}" ]; then
+    QEMU_ARGS+=(-drive "file=${CACHE_IMG},format=raw,if=virtio,index=5")
+fi
+
 if [ "${HEADLESS}" -eq 1 ]; then
     QEMU_ARGS+=(
         -display none
@@ -129,7 +166,6 @@ if [ "${HEADLESS}" -eq 1 ]; then
     echo "Running headless. Connect via VNC at localhost:5900"
 else
     QEMU_ARGS+=(
-        -device "virtio-gpu-pci,xres=1280,yres=720"
         -display default,show-cursor=on
     )
 fi
