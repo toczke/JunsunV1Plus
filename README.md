@@ -75,7 +75,8 @@ Complete technical reverse-engineering documentation, hardware specifications, p
 - **`car_settings_bridge/`**: Native Android app injecting "Car Settings" into stock Android Settings, providing passwordless direct access to reversing camera, SWC, CAN Bus, DSP, fan control, and factory menus.
 - **`tools/patch_firmware.py`**: Automated Python tool for inspecting, extracting, and splicing partitions into `8667.bin` with `8667.upd` MD5 regeneration.
 - **`tools/debloat_and_customize.sh`**: Shell script to prune Chinese telemetry, strip stock junk launchers, enforce DUDU-OS, and preserve vehicle hardware apps.
-- **`.github/workflows/build_all.yml`**: GitHub Actions automated pipeline to compile TWRP recovery, Flasher APK, and Car Settings Bridge.
+- **`.github/workflows/build_apks.yml`**: GitHub Actions pipeline triggering exclusively on APK changes to compile the Flasher and Car Settings Bridge APKs.
+- **`.github/workflows/build_twrp.yml`**: GitHub Actions pipeline triggering exclusively on recovery and tree changes to compile TWRP.
 
 ---
 
