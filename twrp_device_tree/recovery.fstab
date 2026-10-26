@@ -1,0 +1,27 @@
+# Android fstab file for TWRP on Topway TS8667 / MT6768
+# <src>                                              <mnt_point> <type> <mnt_flags and options>                             <fs_mgr_flags>
+
+/system         ext4    /dev/block/mapper/system        flags=display="System";backup=1;logical;slotselect
+/vendor         ext4    /dev/block/mapper/vendor        flags=display="Vendor";backup=1;logical;slotselect
+/product        ext4    /dev/block/mapper/product       flags=display="Product";backup=1;logical;slotselect
+
+/data           ext4    /dev/block/by-name/userdata     flags=display="Data";encryptable=userdata;fileencryption=aes-256-xts
+/cache          ext4    /dev/block/by-name/cache        flags=display="Cache"
+/boot           emmc    /dev/block/by-name/boot         flags=display="Boot";backup=1;flashimg=1
+/recovery       emmc    /dev/block/by-name/recovery     flags=display="Recovery";backup=1;flashimg=1
+/dtbo           emmc    /dev/block/by-name/dtbo         flags=display="DTBO";backup=1;flashimg=1
+/logo           emmc    /dev/block/by-name/logo         flags=display="Boot Logo";backup=1;flashimg=1
+/nvram          emmc    /dev/block/by-name/nvram        flags=display="NVRAM (Radio/IMEI)";backup=1
+/nvdata         ext4    /dev/block/by-name/nvdata       flags=display="NVData";backup=1
+/protect_f      ext4    /dev/block/by-name/protect1     flags=display="Protect_F";backup=1
+/protect_s      ext4    /dev/block/by-name/protect2     flags=display="Protect_S";backup=1
+/avm            ext4    /dev/block/by-name/avm          flags=display="360 AVM Calibration";backup=1;flashimg=1
+/metadata       ext4    /dev/block/by-name/md_udc       flags=display="Metadata"
+/spmfw          emmc    /dev/block/by-name/spmfw        flags=display="SPMFW";backup=1
+/scp1           emmc    /dev/block/by-name/scp1         flags=display="SCP1";backup=1
+/sspm_1         emmc    /dev/block/by-name/sspm_1       flags=display="SSPM1";backup=1
+/lk             emmc    /dev/block/by-name/lk           flags=display="Bootloader (LK)";backup=1
+
+# External Storage
+/usb_otg        vfat    /dev/block/sdb1 /dev/block/sdb  flags=display="USB Flash Drive";storage;wipeingui;removable
+/external_sd    vfat    /dev/block/mmcblk1p1 /dev/block/mmcblk1 flags=display="MicroSD Card";storage;wipeingui;removable

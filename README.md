@@ -5,6 +5,11 @@ Complete technical reverse-engineering documentation, hardware specifications, p
 ---
 
 ## 📑 Documentation Index
+8. [Modern Custom OS Strategy](docs/08_modern_custom_os_strategy.md)
+   - Decoupling hardware services (MCU, CAN, DSP, 360° AVM) from the user layer.
+   - Removing stock CarPlay/Android Auto (sd_carplay, CarLetter, EasyConnect) for DiPlay.
+   - Custom headunit ROM ecosystem analysis (DUDU-OS, Malaysk, Hal9k).
+   - 3-phase implementation roadmap.
 
 1. [Hardware & Platform Architecture](docs/01_hardware_architecture.md)
    - SoC, Octa-Core big.LITTLE CPU details, GPU, memory, power management (MT6358).
