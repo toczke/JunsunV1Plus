@@ -32,6 +32,26 @@ index ab3eb8df3..1921bb85a 100644
  endif
  UTS_MACHINE	:= aarch64
  endif
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index c4591c0a0..4f57a40f5 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -220,4 +220,5 @@ source "drivers/switch/Kconfig"
+ source "drivers/nfc/Kconfig"
+ 
+ source "drivers/p73-spi/Kconfig"
++source "drivers/kernelsu/Kconfig"
+ endmenu
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 9b3df24e2..4e30d7559 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -187,3 +187,5 @@ obj-$(CONFIG_TRUSTY)	+= trusty/
+ obj-$(CONFIG_GNSS)		+= gnss/
+ obj-$(CONFIG_SWITCH)            += switch/
+ obj-$(CONFIG_NXP_P73_DEVICES) += p73-spi/
++
++obj-$(CONFIG_KSU) += kernelsu/
 diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
 index 9f937b8bc..cfa3df1dc 100644
 --- a/drivers/clocksource/Makefile
@@ -115,6 +135,30 @@ index b9e1108e5..4c5f8b750 100644
  endif
  
  obj-$(CONFIG_DRM_TILCDC_SLAVE_COMPAT) += tilcdc_slave_compat.o \
+diff --git a/drivers/input/input.c b/drivers/input/input.c
+index f9f3d6261..328402062 100644
+--- a/drivers/input/input.c
++++ b/drivers/input/input.c
+@@ -377,11 +377,19 @@ static int input_get_disposition(struct input_dev *dev,
+ 	return disposition;
+ }
+ 
++#ifdef CONFIG_KSU
++extern int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code, int *value);
++#endif
++
+ static void input_handle_event(struct input_dev *dev,
+ 			       unsigned int type, unsigned int code, int value)
+ {
+ 	int disposition = input_get_disposition(dev, type, code, &value);
+ 
++#ifdef CONFIG_KSU
++	ksu_handle_input_handle_event(&type, &code, &value);
++#endif
++
+ 	if (disposition != INPUT_IGNORE_EVENT && type != EV_SYN)
+ 		add_input_randomness(type, code, value);
+ 
 diff --git a/drivers/input/keyboard/mediatek/Makefile b/drivers/input/keyboard/mediatek/Makefile
 index 92242bbf7..2c4fd2fbf 100644
 --- a/drivers/input/keyboard/mediatek/Makefile
@@ -2371,6 +2415,110 @@ index 3055a622c..ea1e1d6c1 100644
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/dbgtop
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include/mach
  ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/koro/$(CONFIG_MTK_PLATFORM)/inc
+diff --git a/fs/exec.c b/fs/exec.c
+index ae0a49517..acd97fe59 100644
+--- a/fs/exec.c
++++ b/fs/exec.c
+@@ -1709,6 +1709,11 @@ static int exec_binprm(struct linux_binprm *bprm)
+ /*
+  * sys_execve() executes a new program.
+  */
++#ifdef CONFIG_KSU
++extern int ksu_handle_execveat(int *fd, struct filename **filename_ptr, void *argv,
++			void *envp, int *flags);
++#endif
++
+ static int do_execveat_common(int fd, struct filename *filename,
+ 			      struct user_arg_ptr argv,
+ 			      struct user_arg_ptr envp,
+@@ -1720,6 +1725,10 @@ static int do_execveat_common(int fd, struct filename *filename,
+ 	struct files_struct *displaced;
+ 	int retval;
+ 
++#ifdef CONFIG_KSU
++	ksu_handle_execveat(&fd, &filename, &argv, &envp, &flags);
++#endif
++
+ 	if (IS_ERR(filename))
+ 		return PTR_ERR(filename);
+ 
+diff --git a/fs/open.c b/fs/open.c
+index 3b62683fe..081f0a619 100644
+--- a/fs/open.c
++++ b/fs/open.c
+@@ -359,6 +359,11 @@ SYSCALL_DEFINE4(fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
+  * We do this by temporarily clearing all FS-related capabilities and
+  * switching the fsuid/fsgid around to the real ones.
+  */
++#ifdef CONFIG_KSU
++extern int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode,
++			 int *flags);
++#endif
++
+ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
+ {
+ 	const struct cred *old_cred;
+@@ -369,6 +374,10 @@ SYSCALL_DEFINE3(faccessat, int, dfd, const char __user *, filename, int, mode)
+ 	int res;
+ 	unsigned int lookup_flags = LOOKUP_FOLLOW;
+ 
++#ifdef CONFIG_KSU
++	ksu_handle_faccessat(&dfd, &filename, &mode, NULL);
++#endif
++
+ 	if (mode & ~S_IRWXO)	/* where's F_OK, X_OK, W_OK, R_OK? */
+ 		return -EINVAL;
+ 
+diff --git a/fs/read_write.c b/fs/read_write.c
+index 0da6e4f19..757c7c3fc 100644
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -429,10 +429,19 @@ ssize_t kernel_read(struct file *file, void *buf, size_t count, loff_t *pos)
+ }
+ EXPORT_SYMBOL(kernel_read);
+ 
++#ifdef CONFIG_KSU
++extern int ksu_handle_vfs_read(struct file **file_ptr, char __user **buf_ptr,
++			size_t *count_ptr, loff_t **pos);
++#endif
++
+ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
+ {
+ 	ssize_t ret;
+ 
++#ifdef CONFIG_KSU
++	ksu_handle_vfs_read(&file, &buf, &count, &pos);
++#endif
++
+ 	if (!(file->f_mode & FMODE_READ))
+ 		return -EBADF;
+ 	if (!(file->f_mode & FMODE_CAN_READ))
+diff --git a/fs/stat.c b/fs/stat.c
+index 0fda4b6b8..eeee1f02e 100644
+--- a/fs/stat.c
++++ b/fs/stat.c
+@@ -163,6 +163,10 @@ EXPORT_SYMBOL(vfs_statx_fd);
+  *
+  * 0 will be returned on success, and a -ve error code if unsuccessful.
+  */
++#ifdef CONFIG_KSU
++extern int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);
++#endif
++
+ int vfs_statx(int dfd, const char __user *filename, int flags,
+ 	      struct kstat *stat, u32 request_mask)
+ {
+@@ -170,6 +174,10 @@ int vfs_statx(int dfd, const char __user *filename, int flags,
+ 	int error = -EINVAL;
+ 	unsigned int lookup_flags = LOOKUP_FOLLOW | LOOKUP_AUTOMOUNT;
+ 
++#ifdef CONFIG_KSU
++	ksu_handle_stat(&dfd, &filename, &flags);
++#endif
++
+ 	if ((flags & ~(AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT |
+ 		       AT_EMPTY_PATH | KSTAT_QUERY_FLAGS)) != 0)
+ 		return -EINVAL;
 diff --git a/include/linux/soc/mediatek/mtk_sip_svc.h b/include/linux/soc/mediatek/mtk_sip_svc.h
 index 1c00a3ff5..bf943c594 100644
 --- a/include/linux/soc/mediatek/mtk_sip_svc.h
