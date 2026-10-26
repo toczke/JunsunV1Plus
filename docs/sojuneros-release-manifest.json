@@ -1,0 +1,58 @@
+{
+  "rom_name": "SojunerOS",
+  "version": "20.0",
+  "build_date": "2026-10-26T16:07:10Z",
+  "target_android_version": "13",
+  "api_level": 33,
+  "base": "LineageOS 20",
+  "device": {
+    "manufacturer": "Topway",
+    "model": "TS8667",
+    "commercial_name": "Junsun V1 Plus / JunCan UI03",
+    "soc": "MediaTek MT8667 / MT6768",
+    "resolution": "1280x720 Landscape",
+    "density_dpi": 213
+  },
+  "ui_and_settings": {
+    "default_launcher": "DUDU-OS",
+    "car_settings_bridge_package": "com.topway.carsettingsbridge",
+    "root_solution": "Magisk 26+"
+  },
+  "security_hardening": {
+    "telemetry_stripped": true,
+    "backdoor_ffsu_removed": true,
+    "selinux_mode": "permissive_bringup_enforcing_target"
+  },
+  "hardware_services_whitelisted": [
+    "com.ts.MainUI (Headless MCU/CAN UART daemon)",
+    "libcan59.so (340+ vehicle protocols)",
+    "com.ts.backcar (Techpoint TP2850 360 AVM & Reverse)",
+    "com.ts.set.dsp (ROHM BD3702FV 32-band EQ)",
+    "com.ts.main.cpufan (Thermal governor)",
+    "com.ankai.cardvr (Front Dashcam)",
+    "com.ts.main.tpms (Tire Pressure Monitoring)",
+    "com.vendor.DvdBox (USB Optical Drive)"
+  ],
+  "verified_partition_hashes": {
+    "boot": {
+      "file": "boot.img",
+      "sha256": "df89a526f669cfcfcfd50dcae76d422870bd4c045359e386469bc6b97ce285a8"
+    },
+    "system": {
+      "file": "system.img",
+      "sha256": "c5a1fb85f20811f99665c77525c388e3d46235698f0b625639b906066a0a02a6"
+    },
+    "vendor": {
+      "file": "vendor.img",
+      "sha256": "c5b777cc884816730f8302489578255051790d0f65854a968e598b7a75a29730"
+    },
+    "product": {
+      "file": "product.img",
+      "sha256": "396b5762ca69af6e97f00194ca56264e79f2cc92e3613ed05bceab2e67858990"
+    },
+    "recovery": {
+      "file": "recovery.img",
+      "sha256": "7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f"
+    }
+  }
+}

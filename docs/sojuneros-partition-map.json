@@ -1,0 +1,241 @@
+{
+  "device": {
+    "manufacturer": "Topway / TengShi",
+    "model": "TS-8667-02",
+    "commercial_name": "Junsun V1 Plus / JunCan UI03",
+    "platform": "spm8667p1_64",
+    "soc": "MediaTek MT8667 / MT6768",
+    "cpu": "8-Core ARM64 (2x Cortex-A75 @ 2.0GHz + 6x Cortex-A55 @ 1.8GHz)",
+    "gpu": "ARM Mali-G52 MC2",
+    "panel": {
+      "resolution": "1280x720",
+      "aspect_ratio": "16:9",
+      "orientation": "Forced Landscape"
+    }
+  },
+  "firmware_container": {
+    "format": "Topway xj66 binary pack",
+    "magic": "xj66",
+    "header_size_bytes": 2312,
+    "header_size_hex": "0x908",
+    "entry_size_bytes": 72,
+    "entry_count": 15,
+    "payload_start_offset_hex": "0x908",
+    "companion_file": "8667.upd",
+    "companion_checksum_type": "MD5",
+    "stock_firmware_md5": "d40ec7636699136f0036f60167a958e2"
+  },
+  "container_partitions": [
+    {
+      "index": 0,
+      "filename": "super.img",
+      "partition_name": "super",
+      "size_bytes": 3823937528,
+      "size_hex": "0xe3eca7f8",
+      "offset_hex": "0x908",
+      "flags": 1,
+      "type": "Android Sparse Image (Contains Dynamic Logical Partitions)"
+    },
+    {
+      "index": 1,
+      "filename": "recovery.img",
+      "partition_name": "recovery",
+      "size_bytes": 33554432,
+      "size_hex": "0x2000000",
+      "offset_hex": "0xe3ecb100",
+      "flags": 0,
+      "type": "Raw Partition Image",
+      "sha256": "7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f",
+      "avb_footer": {
+        "version": "1.0",
+        "algorithm": "SHA256_RSA2048",
+        "public_key_sha1": "0aa0987116fc792f36bc909b0a4d530413f02a54",
+        "original_image_size": 18077696
+      }
+    },
+    {
+      "index": 2,
+      "filename": "md1img.img",
+      "partition_name": "md1img",
+      "size_bytes": 0,
+      "size_hex": "0x0",
+      "flags": 0,
+      "type": "Modem Firmware (Zero-padded in update bundle)"
+    },
+    {
+      "index": 3,
+      "filename": "logo.bin",
+      "partition_name": "logo",
+      "size_bytes": 0,
+      "size_hex": "0x0",
+      "flags": 0,
+      "type": "Boot Logo (Preserved from existing flash)"
+    },
+    {
+      "index": 4,
+      "filename": "spmfw.img",
+      "partition_name": "spmfw",
+      "size_bytes": 49296,
+      "size_hex": "0xc090",
+      "flags": 0,
+      "type": "System Power Manager Firmware"
+    },
+    {
+      "index": 5,
+      "filename": "scp.img",
+      "partition_name": "scp1",
+      "size_bytes": 547040,
+      "size_hex": "0x858e0",
+      "flags": 0,
+      "type": "System Control Processor Firmware (Slot 1)"
+    },
+    {
+      "index": 6,
+      "filename": "scp.img",
+      "partition_name": "scp2",
+      "size_bytes": 547040,
+      "size_hex": "0x858e0",
+      "flags": 0,
+      "type": "System Control Processor Firmware (Slot 2)"
+    },
+    {
+      "index": 7,
+      "filename": "sspm.img",
+      "partition_name": "sspm_1",
+      "size_bytes": 504208,
+      "size_hex": "0x7b190",
+      "flags": 0,
+      "type": "Secure System Power Manager (Slot 1)"
+    },
+    {
+      "index": 8,
+      "filename": "sspm.img",
+      "partition_name": "sspm_2",
+      "size_bytes": 504208,
+      "size_hex": "0x7b190",
+      "flags": 0,
+      "type": "Secure System Power Manager (Slot 2)"
+    },
+    {
+      "index": 9,
+      "filename": "lk.img",
+      "partition_name": "lk",
+      "size_bytes": 1510160,
+      "size_hex": "0x170b10",
+      "flags": 0,
+      "type": "Little Kernel Bootloader (Primary)"
+    },
+    {
+      "index": 10,
+      "filename": "lk.img",
+      "partition_name": "lk2",
+      "size_bytes": 1510160,
+      "size_hex": "0x170b10",
+      "flags": 0,
+      "type": "Little Kernel Bootloader (Backup)"
+    },
+    {
+      "index": 11,
+      "filename": "boot.img",
+      "partition_name": "boot",
+      "size_bytes": 33554432,
+      "size_hex": "0x2000000",
+      "flags": 0,
+      "type": "Android Boot Image v2",
+      "sha256": "df89a526f669cfcfcfd50dcae76d422870bd4c045359e386469bc6b97ce285a8",
+      "header_v2": {
+        "magic": "ANDROID!",
+        "kernel_size": 11330259,
+        "kernel_load_addr": "0x40080000",
+        "ramdisk_size": 809701,
+        "ramdisk_load_addr": "0x47c80000",
+        "dtb_size": 105691,
+        "dtb_load_addr": "0x4bc80000",
+        "page_size": 2048,
+        "cmdline": "bootopt=64S3,32N2,64N2 buildvariant=userdebug"
+      },
+      "avb_footer": {
+        "version": "1.0",
+        "algorithm": "SHA256_RSA2048",
+        "public_key_sha1": "9d808b0995768d0677fccb1efcddb7cf9e153d99",
+        "original_image_size": 12251136,
+        "os_version": "10",
+        "security_patch": "2019-06-06"
+      }
+    },
+    {
+      "index": 12,
+      "filename": "dtbo.img",
+      "partition_name": "dtbo",
+      "size_bytes": 8388608,
+      "size_hex": "0x800000",
+      "flags": 0,
+      "type": "Device Tree Blob Overlay"
+    },
+    {
+      "index": 13,
+      "filename": "tee.img",
+      "partition_name": "tee1",
+      "size_bytes": 128112,
+      "size_hex": "0x1f470",
+      "flags": 0,
+      "type": "Trusted Execution Environment (Slot 1)"
+    },
+    {
+      "index": 14,
+      "filename": "tee.img",
+      "partition_name": "tee2",
+      "size_bytes": 128112,
+      "size_hex": "0x1f470",
+      "flags": 0,
+      "type": "Trusted Execution Environment (Slot 2)"
+    }
+  ],
+  "super_logical_partitions": [
+    {
+      "name": "system",
+      "filesystem": "ext4",
+      "partition_size_bytes": 2116374528,
+      "original_image_size_bytes": 2082893824,
+      "sha256": "c5a1fb85f20811f99665c77525c388e3d46235698f0b625639b906066a0a02a6",
+      "avb_verity": {
+        "version": 1,
+        "algorithm": "sha256",
+        "salt": "a133fcd11f76f1b0033dc336af5b3d24f7a675fa7f3bbba435a8ad7f5dc3352f",
+        "root_digest": "4fe6171adebca72f0ba3dfaccc28adef836853db807562bc052144c121e45f74",
+        "os_version": "10",
+        "security_patch": "2021-06-05"
+      }
+    },
+    {
+      "name": "vendor",
+      "filesystem": "ext4",
+      "partition_size_bytes": 1500356608,
+      "original_image_size_bytes": 1476599808,
+      "sha256": "c5b777cc884816730f8302489578255051790d0f65854a968e598b7a75a29730",
+      "avb_verity": {
+        "version": 1,
+        "algorithm": "sha256",
+        "salt": "754e38ffad4ad86467efd5455a2fdec2e5790b0b68e89e4e991b8ca817dd6f49",
+        "root_digest": "1062c455efd30afe487173201f34598b35d3b6b7450305a6f802fbaa7cb007b5",
+        "os_version": "10",
+        "security_patch": "2021-06-05"
+      }
+    },
+    {
+      "name": "product",
+      "filesystem": "ext4",
+      "partition_size_bytes": 241696768,
+      "original_image_size_bytes": 237797376,
+      "sha256": "396b5762ca69af6e97f00194ca56264e79f2cc92e3613ed05bceab2e67858990",
+      "avb_verity": {
+        "version": 1,
+        "algorithm": "sha256",
+        "salt": "5be579e25b0115514fe28db1d534264ac3665352be486ed5dce33831f04bc33c",
+        "root_digest": "3cfc836f80147f22500bf268bca09e0300f880841bf41cd6a3e2d4caf4df5e0b",
+        "os_version": "10",
+        "security_patch": "2021-06-05"
+      }
+    }
+  ]
+}

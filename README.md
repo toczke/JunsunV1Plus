@@ -73,6 +73,20 @@ Built upon the robust **LineageOS 20 (Android 13)** open-source foundation, Soju
 
 ---
 
+## 📚 Technical Documentation & Deliverables
+
+Comprehensive specifications and reports generated for SojunerOS 20.0:
+
+1. **[Feasibility Audit & Compatibility Analysis](docs/sojuneros-feasibility-audit.md)**: Deep dive into Treble VNDK 29 constraints, hardware verification, and dual-layer architecture.
+2. **[Build & Deployment Guide](docs/sojuneros-build-guide.md)**: Step-by-step instructions for assembling `8667.bin` and flashing via USB / TWRP.
+3. **[Hardware Validation Guide](docs/sojuneros-hardware-validation.md)**: Test procedures for ROHM DSP, CAN bus, SWC, TP2850 reverse camera, and fan control.
+4. **[Emergency Recovery & Rollback Guide](docs/sojuneros-recovery-and-rollback.md)**: Fail-safe recovery, forced USB recovery mode, and unbricking instructions.
+5. **[Partition Map & Offsets Specification (JSON)](docs/sojuneros-partition-map.json)**: Exact byte offsets, sizes, flags, and SHA-256 hashes of all firmware partitions.
+6. **[Feature-by-Feature Matrix](docs/sojuneros-feature-matrix.md)**: Complete subsystem status table with verified hardware realities.
+7. **[Release Manifest (JSON)](docs/sojuneros-release-manifest.json)**: Reproducible build manifest and verification hashes.
+
+---
+
 ## 🚀 Building SojunerOS from Source
 
 ### Prerequisites
