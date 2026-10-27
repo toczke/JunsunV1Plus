@@ -19,7 +19,7 @@
         android:id="@+id/tv_root_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Checking root exploit (ffsu)..."
+        android:text="Sprawdzanie uprawnień roota (ffsu)..."
         android:textColor="#FFBB33"
         android:textSize="16sp"
         android:layout_marginTop="6dp" />
@@ -29,8 +29,19 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="20dp"
-        android:weightSum="3">
+        android:layout_marginTop="16dp"
+        android:weightSum="4">
+
+        <Button
+            android:id="@+id/btn_adb_wifi"
+            android:layout_width="0dp"
+            android:layout_height="65dp"
+            android:layout_weight="1"
+            android:text="⚡ ADB Wi-Fi (5555)"
+            android:textSize="13sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0088CC"
+            android:layout_marginEnd="8dp" />
 
         <Button
             android:id="@+id/btn_backup"
@@ -38,7 +49,7 @@
             android:layout_height="65dp"
             android:layout_weight="1"
             android:text="1. Backup Recovery"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:layout_marginEnd="8dp" />
 
         <Button
@@ -47,7 +58,7 @@
             android:layout_height="65dp"
             android:layout_weight="1"
             android:text="2. Flash TWRP"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:layout_marginEnd="8dp" />
 
         <Button
@@ -55,8 +66,8 @@
             android:layout_width="0dp"
             android:layout_height="65dp"
             android:layout_weight="1"
-            android:text="3. Reboot to Recovery"
-            android:textSize="14sp" />
+            android:text="3. Reboot Recovery"
+            android:textSize="13sp" />
     </LinearLayout>
 
     <!-- Path Selector / Status info -->
@@ -64,7 +75,7 @@
         android:id="@+id/tv_file_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Required image file: /sdcard/twrp.img or from USB drive"
+        android:text="Wymagany plik: /sdcard/twrp.img lub podłączony pendrive USB"
         android:textColor="#AAAAAA"
         android:textSize="13sp"
         android:layout_marginTop="12dp" />
@@ -74,7 +85,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="10dp"
         android:background="#000000"
         android:padding="10dp">
 

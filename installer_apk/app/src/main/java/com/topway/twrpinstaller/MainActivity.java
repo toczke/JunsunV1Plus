@@ -28,6 +28,7 @@ public class MainActivity extends Activity {
     private TextView tvRootStatus;
     private TextView tvFileInfo;
     private TextView tvLogs;
+    private Button btnAdbWifi;
     private Button btnBackup;
     private Button btnFlash;
     private Button btnReboot;
@@ -45,12 +46,14 @@ public class MainActivity extends Activity {
         tvRootStatus = findViewById(R.id.tv_root_status);
         tvFileInfo = findViewById(R.id.tv_file_info);
         tvLogs = findViewById(R.id.tv_logs);
+        btnAdbWifi = findViewById(R.id.btn_adb_wifi);
         btnBackup = findViewById(R.id.btn_backup);
         btnFlash = findViewById(R.id.btn_flash);
         btnReboot = findViewById(R.id.btn_reboot_recovery);
 
         checkExploitStatus();
 
+        btnAdbWifi.setOnClickListener(v -> runEnableAdbWifi());
         btnBackup.setOnClickListener(v -> runBackupRecovery());
         btnFlash.setOnClickListener(v -> runFlashTwrp());
         btnReboot.setOnClickListener(v -> runRebootRecovery());
@@ -78,10 +81,12 @@ public class MainActivity extends Activity {
             if (result.contains("uid=0")) {
                 isRootAvailable = true;
                 mainHandler.post(() -> {
-                    tvRootStatus.setText("Status ROOT: AKTYWNY (uid=0) - Pełne uprawnienia roota!");
+                    tvRootStatus.setText("Status ROOT: AKTYWNY (uid=0) - Pełne uprawnienia!");
                     tvRootStatus.setTextColor(0xFF00FF00); // Green
                 });
                 log("Uprawnienia ROOT potwierdzone pomyślnie: " + result.trim());
+                // Automatically activate ADB over Wi-Fi on boot/launch
+                runEnableAdbWifi();
             } else {
                 isRootAvailable = false;
                 mainHandler.post(() -> {
@@ -89,6 +94,42 @@ public class MainActivity extends Activity {
                     tvRootStatus.setTextColor(0xFFFF4444); // Red
                 });
                 log("Błąd uzyskania uprawnień roota: " + result.trim());
+            }
+        }).start();
+    }
+
+    /**
+     * Activates ADB listening over TCP/IP port 5555 and discovers IP address
+     */
+    private void runEnableAdbWifi() {
+        new Thread(() -> {
+            log("Uruchamianie ADB przez sieć Wi-Fi (port 5555)...");
+            executeRootCommand("setprop service.adb.tcp.port 5555 && stop adbd && start adbd");
+
+            // Discover IP of wlan0 or active default route
+            String ip = executeRootCommand("ip route get 1.1.1.1 2>/dev/null | awk '{print $7}'").trim();
+            if (ip.isEmpty() || ip.contains("Exception")) {
+                ip = executeRootCommand("ip -4 addr show wlan0 2>/dev/null | grep -oE 'inet [0-9.]+' | cut -d' ' -f2").trim();
+            }
+            if (ip.isEmpty() || ip.contains("Exception")) {
+                ip = executeRootCommand("getprop dhcp.wlan0.ipaddress").trim();
+            }
+
+            if (!ip.isEmpty() && !ip.contains("\n") && !ip.contains(" ")) {
+                final String targetIp = ip;
+                mainHandler.post(() -> {
+                    tvRootStatus.setText("ADB aktywne: adb connect " + targetIp + ":5555");
+                    tvRootStatus.setTextColor(0xFF00E5FF); // Cyan
+                });
+                log("==================================================");
+                log("ADB PO WI-FI JEST AKTYWNE!");
+                log("Wpisz na komputerze w terminalu:");
+                log("    adb connect " + targetIp + ":5555");
+                log("==================================================");
+            } else {
+                log("ADB nasłuchuje na porcie 5555.");
+                log("Sprawdź adres IP w Ustawieniach Wi-Fi radia.");
+                log("Polecenie na PC: adb connect <IP_RADIA>:5555");
             }
         }).start();
     }
