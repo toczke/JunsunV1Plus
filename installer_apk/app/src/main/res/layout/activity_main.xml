@@ -3,91 +3,143 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="20dp"
+    android:padding="16dp"
     android:background="#121212">
 
-    <!-- Title and Subtitle -->
-    <TextView
+    <!-- Header Section -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Junsun V1 Plus / Topway TS8667 Flasher"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Junsun V1 Plus / TS8667 Root &amp; TWRP Flasher"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btn_adb_wifi"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="⚡ ADB Wi-Fi"
+            android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0088CC" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_root_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Sprawdzanie uprawnień roota (ffsu)..."
+        android:text="Sprawdzanie uprawnień (ffsu)..."
         android:textColor="#FFBB33"
-        android:textSize="16sp"
-        android:layout_marginTop="6dp" />
+        android:textSize="14sp"
+        android:layout_marginTop="4dp" />
 
-    <!-- Button Row for Landscape 1280x720 Screen -->
+    <!-- Action Buttons Grid: Row 1 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="16dp"
-        android:weightSum="4">
+        android:layout_marginTop="12dp"
+        android:weightSum="3">
 
         <Button
-            android:id="@+id/btn_adb_wifi"
+            android:id="@+id/btn_flash_magisk"
             android:layout_width="0dp"
-            android:layout_height="65dp"
+            android:layout_height="62dp"
             android:layout_weight="1"
-            android:text="⚡ ADB Wi-Fi (5555)"
-            android:textSize="13sp"
+            android:text="🔥 1. ZAINSTALUJ ROOT (MAGISK)"
+            android:textSize="12sp"
+            android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#0088CC"
-            android:layout_marginEnd="8dp" />
+            android:backgroundTint="#2E7D32"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/btn_flash_twrp_ffup"
+            android:layout_width="0dp"
+            android:layout_height="62dp"
+            android:layout_weight="1"
+            android:text="🛠️ 2. WGRAJ TWRP &amp; START (FFUP)"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#1565C0"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/btn_boot_twrp_direct"
+            android:layout_width="0dp"
+            android:layout_height="62dp"
+            android:layout_weight="1"
+            android:text="🚀 3. ODPAL TWRP WPROST (BOOT)"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E65100" />
+    </LinearLayout>
+
+    <!-- Action Buttons Grid: Row 2 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp"
+        android:weightSum="3">
 
         <Button
             android:id="@+id/btn_backup"
             android:layout_width="0dp"
-            android:layout_height="65dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="1. Backup Recovery"
-            android:textSize="13sp"
-            android:layout_marginEnd="8dp" />
+            android:text="💾 Backup Boot &amp; Recovery"
+            android:textSize="12sp"
+            android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_flash"
+            android:id="@+id/btn_restore_stock"
             android:layout_width="0dp"
-            android:layout_height="65dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="2. Flash TWRP"
-            android:textSize="13sp"
-            android:layout_marginEnd="8dp" />
+            android:text="🔄 Przywróć Fabryczny Stock"
+            android:textSize="12sp"
+            android:backgroundTint="#424242"
+            android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_reboot_recovery"
+            android:id="@+id/btn_reboot"
             android:layout_width="0dp"
-            android:layout_height="65dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
-            android:text="3. Reboot Recovery"
-            android:textSize="13sp" />
+            android:text="🔁 Restartuj Radio"
+            android:textSize="12sp"
+            android:backgroundTint="#C62828" />
     </LinearLayout>
 
-    <!-- Path Selector / Status info -->
+    <!-- Detection Info -->
     <TextView
         android:id="@+id/tv_file_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Wymagany plik: /sdcard/twrp.img lub podłączony pendrive USB"
+        android:text="Wykrywanie plików z pendrive..."
         android:textColor="#AAAAAA"
-        android:textSize="13sp"
-        android:layout_marginTop="12dp" />
+        android:textSize="12sp"
+        android:layout_marginTop="8dp" />
 
-    <!-- Real-time Terminal Log View -->
+    <!-- Terminal Logs -->
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="6dp"
         android:background="#000000"
-        android:padding="10dp">
+        android:padding="8dp">
 
         <TextView
             android:id="@+id/tv_logs"
@@ -95,7 +147,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
             android:textColor="#00FF00"
-            android:textSize="13sp"
+            android:textSize="12sp"
             android:text="[System initialized and ready]\n" />
     </ScrollView>
 
