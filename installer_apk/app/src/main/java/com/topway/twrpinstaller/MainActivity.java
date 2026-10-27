@@ -13,9 +13,15 @@ import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.InputStreamReader;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Enumeration;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
 
@@ -97,23 +103,77 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    private String getLocalIpAddress() {
+        try {
+            // First check Wi-Fi interface (wlan0)
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface intf = en.nextElement();
+                String name = intf.getName().toLowerCase(Locale.US);
+                if (name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("tiwlan")) {
+                    for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
+                        InetAddress inetAddress = enumIpAddr.nextElement();
+                        if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
+                            String host = inetAddress.getHostAddress();
+                            if (host != null && !host.isEmpty() && !host.equals("127.0.0.1")) {
+                                return host;
+                            }
+                        }
+                    }
+                }
+            }
+            // General fallback across any active non-loopback network interface
+            for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
+                NetworkInterface intf = en.nextElement();
+                if (intf.isLoopback() || !intf.isUp()) continue;
+                for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
+                    InetAddress inetAddress = enumIpAddr.nextElement();
+                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
+                        String host = inetAddress.getHostAddress();
+                        if (host != null && !host.isEmpty() && !host.equals("127.0.0.1")) {
+                            return host;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log("Błąd odczytu IP: " + ex.getMessage());
+        }
+
+        // Secondary fallback: parse 'ip addr show' with strict IPv4 regex
+        try {
+            String out = executeRootCommand("ip -4 addr show 2>/dev/null");
+            Pattern p = Pattern.compile("inet\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)");
+            Matcher m = p.matcher(out);
+            while (m.find()) {
+                String candidate = m.group(1);
+                if (!"127.0.0.1".equals(candidate)) {
+                    return candidate;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
     private void runEnableAdbWifi() {
         new Thread(() -> {
             log("Konfiguracja ADB przez Wi-Fi (port 5555)...");
             executeRootCommand("setprop service.adb.tcp.port 5555 && stop adbd && start adbd");
 
-            String ip = executeRootCommand("ip route get 1.1.1.1 2>/dev/null | awk '{print $7}'").trim();
-            if (ip.isEmpty() || ip.contains("Exception")) {
-                ip = executeRootCommand("ip -4 addr show wlan0 2>/dev/null | grep -oE 'inet [0-9.]+' | cut -d' ' -f2").trim();
-            }
-
-            if (!ip.isEmpty() && !ip.contains("\n") && !ip.contains(" ")) {
+            String ip = getLocalIpAddress();
+            if (ip != null && !ip.isEmpty()) {
                 final String targetIp = ip;
                 mainHandler.post(() -> {
                     tvRootStatus.setText("ADB aktywne: adb connect " + targetIp + ":5555");
                     tvRootStatus.setTextColor(0xFF00E5FF);
                 });
                 log("ADB PO WI-FI AKTYWNE: adb connect " + targetIp + ":5555");
+            } else {
+                mainHandler.post(() -> {
+                    tvRootStatus.setText("ADB aktywne na porcie 5555 (brak aktywnego IP Wi-Fi)");
+                    tvRootStatus.setTextColor(0xFFFFAA00);
+                });
+                log("ADB aktywne na porcie 5555. Połącz stację z Wi-Fi, aby zobaczyć IP.");
             }
         }).start();
     }
