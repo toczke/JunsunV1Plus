@@ -2,3 +2,9 @@ out/
 vendor/
 *.log
 *.tmp
+
+# Large binary partition dumps & diagnostic packages
+diag_pack.tar.gz
+extracted_diagnostics/
+output_images/*.img
+!output_images/README.md
