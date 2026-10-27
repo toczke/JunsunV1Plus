@@ -1,0 +1,4 @@
+out/
+vendor/
+*.log
+*.tmp

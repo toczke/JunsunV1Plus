@@ -20,7 +20,6 @@ jobs:
         run: |
           sudo apt-get clean
           sudo rm -rf /usr/share/dotnet /etc/mysql /var/lib/mysql /usr/local/lib/android /opt/ghc
-          # Safely replace default 4GB swap with 10GB swap to prevent OOM
           sudo swapoff -a || true
           sudo rm -f /swapfile || true
           sudo fallocate -l 10G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=10240
@@ -63,6 +62,7 @@ jobs:
       - name: Build TWRP Recovery
         run: |
           cd ~/twrp
+          export ALLOW_MISSING_DEPENDENCIES=true
           source build/envsetup.sh
           lunch omni_ts8667-eng || lunch twrp_ts8667-eng
           mka recoveryimage -j$(nproc --all)
@@ -70,18 +70,20 @@ jobs:
       - name: Prepare Artifacts & Add AVB Hash Footer
         run: |
           OUT_DIR=~/twrp/out/target/product/ts8667
+          TARGET_FILE="twrp_junsun_${{ github.run_number }}.img"
           if [ -f "$OUT_DIR/recovery.img" ]; then
-            cp "$OUT_DIR/recovery.img" ./twrp_ts8667_raw.img
+            cp "$OUT_DIR/recovery.img" ./twrp_raw.img
             python3 -m pip install avbtool 2>/dev/null || true
             if command -v avbtool >/dev/null; then
               avbtool add_hash_footer \
-                --image ./twrp_ts8667_raw.img \
+                --image ./twrp_raw.img \
                 --partition_size 33554432 \
                 --partition_name recovery \
                 --algorithm SHA256_RSA2048 \
                 --key ~/twrp/external/avb/test/data/testkey_rsa2048.pem 2>/dev/null || true
             fi
-            mv ./twrp_ts8667_raw.img ./twrp_ts8667_landscape_1280x720.img
+            mv ./twrp_raw.img ./${TARGET_FILE}
+            echo "TARGET_FILE=${TARGET_FILE}" >> $GITHUB_ENV
           else
             echo "Recovery image not found in out directory"
             exit 1
@@ -90,6 +92,6 @@ jobs:
       - name: Upload TWRP Recovery Image
         uses: actions/upload-artifact@v4
         with:
-          name: twrp_ts8667_landscape_1280x720
-          path: ./twrp_ts8667_landscape_1280x720.img
+          name: twrp_junsun_${{ github.run_number }}.img
+          path: ./${{ env.TARGET_FILE }}
           if-no-files-found: error
