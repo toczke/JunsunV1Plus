@@ -12,6 +12,7 @@
         android:icon="@android:drawable/ic_menu_manage"
         android:label="TS8667 TWRP Flasher"
         android:theme="@android:style/Theme.DeviceDefault"
+        android:requestLegacyExternalStorage="true"
         android:supportsRtl="true">
 
         <!-- Forced Landscape Orientation for Car Screen -->
