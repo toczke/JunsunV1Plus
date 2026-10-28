@@ -117,11 +117,19 @@ if [ -b /dev/block/by-name/system ] || [ -b /dev/block/mapper/system ]; then
     HAS_SYSTEM_PLAIN=1
 fi
 
+# Detect ambiguous contradictory mixed topologies
+if { [ "$HAS_SLOT_A" -eq 1 ] || [ "$HAS_SLOT_B" -eq 1 ]; } && [ "$HAS_SYSTEM_PLAIN" -eq 1 ]; then
+    ui_print "[-] ERROR: Contradictory mixed partition layout detected!"
+    ui_print "    Both slot-based (system_a/system_b) and non-slot (system) partitions exist."
+    ui_print "    Aborting before modifying physical storage."
+    exit 1
+fi
+
 # Strict multi-factor topology check
 if [ "$HAS_SLOT_A" -eq 1 ] || [ "$HAS_SLOT_B" -eq 1 ]; then
     # A/B topology detected on disk
     if [ -z "$SLOT" ]; then
-        ui_print "[-] ERROR: A/B partition topology detected, but bootloader provided no active slot suffix!"
+        ui_print "[-] ERROR: A/B partition topology detected on disk, but bootloader provided no active slot suffix!"
         ui_print "    Refusing to guess active slot. Aborting before modifying storage."
         exit 1
     fi
@@ -170,52 +178,76 @@ ui_print "[✓] Archive integrity verified (CRC32 valid)."
 # 3. Pinned SHA-256 identity verification of system.img against approved manifest
 # Uses FIFO named pipe to ensure independent exit-code verification for BOTH unzip and sha256sum
 ui_print "- Verifying system.img identity against pinned release SHA-256..."
-FIFO_PATH="/tmp/sha_fifo.$$"
-SHA_TMP="/tmp/sys_sha.$$"
-rm -f "$FIFO_PATH" "$SHA_TMP"
+WORK_TMP=$(mktemp -d /tmp/topway_flasher.XXXXXX 2>/dev/null || true)
+if [ -z "$WORK_TMP" ] || [ ! -d "$WORK_TMP" ]; then
+    ui_print "[-] ERROR: Failed to create secure temporary directory!"
+    exit 1
+fi
+FIFO_PATH="$WORK_TMP/sha_fifo"
+SHA_TMP="$WORK_TMP/sys_sha"
 
-clean_fifo_trap() {
-    rm -f "$FIFO_PATH" "$SHA_TMP" 2>/dev/null || true
-    if [ -n "${SHA_PID:-}" ]; then
-        kill "$SHA_PID" 2>/dev/null || true
+clean_work_tmp() {
+    trap - EXIT HUP INT TERM
+    # Ensure background hash and streaming jobs are terminated
+    if [ -n "${SHA_PID:-}" ] && kill -0 "$SHA_PID" 2>/dev/null; then
+        kill -TERM "$SHA_PID" 2>/dev/null || true
+        wait "$SHA_PID" 2>/dev/null || true
+        SHA_PID=""
+    fi
+    if [ -n "${UNZIP_PID:-}" ] && kill -0 "$UNZIP_PID" 2>/dev/null; then
+        kill -TERM "$UNZIP_PID" 2>/dev/null || true
+        wait "$UNZIP_PID" 2>/dev/null || true
+        UNZIP_PID=""
+    fi
+    if [ -n "${WORK_TMP:-}" ] && [ -d "$WORK_TMP" ]; then
+        rm -rf "$WORK_TMP" 2>/dev/null || true
+        WORK_TMP=""
     fi
 }
-trap clean_fifo_trap EXIT HUP INT TERM
+trap clean_work_tmp EXIT
+trap 'clean_work_tmp; exit 143' TERM
+trap 'clean_work_tmp; exit 130' INT
+trap 'clean_work_tmp; exit 129' HUP
 
 if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
     ui_print "[-] ERROR: Failed to create temporary FIFO named pipe at $FIFO_PATH!"
-    rm -f "$SHA_TMP"
     exit 1
 fi
 
 sha256sum < "$FIFO_PATH" > "$SHA_TMP" 2>/dev/null &
 SHA_PID=$!
 
-UNZIP_OK=1
-if ! unzip -p "$ZIPFILE" system.img > "$FIFO_PATH" 2>/dev/null; then
-    UNZIP_OK=0
-fi
+unzip -p "$ZIPFILE" system.img > "$FIFO_PATH" 2>/dev/null &
+UNZIP_PID=$!
+
+wait "$UNZIP_PID" 2>/dev/null
+UNZIP_STATUS=$?
 
 wait "$SHA_PID" 2>/dev/null
 SHA_STATUS=$?
+
 rm -f "$FIFO_PATH"
 
-if [ "$UNZIP_OK" -ne 1 ]; then
-    ui_print "[-] ERROR: Streaming system.img from ZIP archive failed!"
-    rm -f "$SHA_TMP"
+if [ "$UNZIP_STATUS" -ne 0 ]; then
+    ui_print "[-] ERROR: Streaming system.img from ZIP archive failed (status $UNZIP_STATUS)!"
     exit 1
 fi
 
 if [ "$SHA_STATUS" -ne 0 ]; then
     ui_print "[-] ERROR: sha256sum calculation failed with status $SHA_STATUS!"
-    rm -f "$SHA_TMP"
     exit 1
 fi
 
 ACTUAL_SHA256=$(awk '{print $1}' "$SHA_TMP" 2>/dev/null || echo "")
-rm -f "$SHA_TMP"
 
-if [ -z "$ACTUAL_SHA256" ] || [ "${#ACTUAL_SHA256}" -ne 64 ]; then
+case "$ACTUAL_SHA256" in
+    *[!0-9a-fA-F]*|"")
+        ui_print "[-] ERROR: Computed SHA-256 digest contains non-hexadecimal characters or is empty!"
+        exit 1
+        ;;
+esac
+
+if [ "${#ACTUAL_SHA256}" -ne 64 ]; then
     ui_print "[-] ERROR: Failed to compute valid 64-character SHA-256 digest from stream!"
     exit 1
 fi
