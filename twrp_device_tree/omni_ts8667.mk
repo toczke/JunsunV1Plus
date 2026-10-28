@@ -1,3 +1,5 @@
+LOCAL_PATH := device/topway/ts8667
+
 $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/embedded.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/languages_full.mk)
@@ -11,7 +13,7 @@ $(call inherit-product, vendor/twrp/config/common.mk)
 endif
 
 PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/recovery.fstab:$(TARGET_COPY_OUT_RECOVERY)/root/etc/recovery.fstab
+    $(LOCAL_PATH)/recovery.fstab:$(TARGET_COPY_OUT_RECOVERY)/root/system/etc/recovery.fstab
 
 PRODUCT_NAME := omni_ts8667
 PRODUCT_DEVICE := ts8667

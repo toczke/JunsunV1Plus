@@ -1,4 +1,4 @@
-$(call inherit-product, $(LOCAL_PATH)/omni_ts8667.mk)
+$(call inherit-product, device/topway/ts8667/omni_ts8667.mk)
 
 PRODUCT_NAME := twrp_ts8667
 PRODUCT_DEVICE := ts8667
