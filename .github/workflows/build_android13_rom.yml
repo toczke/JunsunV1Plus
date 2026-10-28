@@ -59,11 +59,17 @@ jobs:
       - name: Run Host Static Analysis & Dry-Run Tests
         run: |
           set -euo pipefail
-          echo "Compiling host test binaries..."
+          echo "Compiling host test binaries & unit test suite..."
+          gcc -Wall -Wextra -O2 android13_aosp/tests/test_mcu_protocol.c -o /tmp/test_mcu_protocol
+          gcc -Wall -Wextra -O2 android13_aosp/mcu_daemon/ts_mcu_daemon.c -o /tmp/host_mcu
           gcc -Wall -Wextra -O2 android13_aosp/dsp_audio/bd3702_init.c -o /tmp/host_bd3702
           gcc -Wall -Wextra -O2 android13_aosp/thermal/fan_governor.c -o /tmp/host_fan
 
+          echo "Running unit test suite..."
+          /tmp/test_mcu_protocol
+
           echo "Running dry-run tests..."
+          /tmp/host_mcu --dry-run
           /tmp/host_bd3702 --dry-run
           /tmp/host_fan --dry-run
 

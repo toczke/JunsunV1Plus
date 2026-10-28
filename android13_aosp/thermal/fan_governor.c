@@ -65,6 +65,14 @@ int main(int argc, char** argv) {
 
     int last_pwm = -1;
     int sensor_error_count = 0;
+    int fan_hw_present = 1;
+
+    if (!dry_run && access(FAN_PATH, F_OK) != 0) {
+        printf("[fan_governor] Notice: %s does not exist on this unit.\n", FAN_PATH);
+        printf("[fan_governor] Topway TS8667 uses passive aluminum chassis heatsink cooling by default.\n");
+        printf("[fan_governor] Running in thermal monitoring mode (no PWM hardware control active).\n");
+        fan_hw_present = 0;
+    }
 
     while (g_running) {
         int temp = read_cpu_temp(dry_run);
@@ -85,15 +93,20 @@ int main(int argc, char** argv) {
         } else {
             sensor_error_count++;
             if (sensor_error_count >= 3) {
-                fprintf(stderr, "[fan_governor] Warning: Thermal sensor read failed! Engaging failsafe PWM (%d/255)\n", FAILSAFE_PWM);
+                if (fan_hw_present) {
+                    fprintf(stderr, "[fan_governor] Warning: Thermal sensor read failed! Engaging failsafe PWM (%d/255)\n", FAILSAFE_PWM);
+                }
                 target_pwm = FAILSAFE_PWM;
             }
         }
 
         if (target_pwm != last_pwm) {
-            set_fan_speed(target_pwm, dry_run);
+            if (fan_hw_present || dry_run) {
+                set_fan_speed(target_pwm, dry_run);
+            }
             if (temp > 0) {
-                printf("[fan_governor] Temp: %d C -> Fan PWM set to %d/255\n", temp / 1000, target_pwm);
+                printf("[fan_governor] CPU Temp: %d C%s\n", temp / 1000,
+                       fan_hw_present ? " (PWM updated)" : " (Passive heatsink)");
             }
             last_pwm = target_pwm;
         }

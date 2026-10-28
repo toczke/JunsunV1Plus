@@ -53,6 +53,6 @@
 
     <permission
         android:name="android.permission.BIND_CAR_SETTINGS_SERVICE"
-        android:protectionLevel="normal" />
+        android:protectionLevel="signatureOrSystem" />
 
 </manifest>

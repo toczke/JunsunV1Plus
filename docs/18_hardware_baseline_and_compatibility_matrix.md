@@ -41,6 +41,22 @@
      avc: denied { open } for comm="com.ts.MainUI" path="/dev/i2c-5" ioctlcmd=0x701 (I2C_SLAVE)
      ```
    - Physical I2C bus for the ROHM BD3702FV processor is **`/dev/i2c-5`**.
+   - Probe implementation (`--probe`) uses purely non-destructive I2C read transactions (`read(fd, &dummy, 1)`) rather than register writes.
 
 3. **Touchscreen Control Node Discovered:**
    - Kernel exports `/proc/forfan_touch_ctrl` with custom ioctls (`0x753`, `0x758`) utilized by `com.ts.MainUI` for multi-touch calibration and gesture processing.
+
+4. **Forensic Clarification on `forfan` Codename & Thermal Architecture:**
+   - The prefix `forfan` across firmware strings (`forfanpara`, `forfanzone`, `forfan_bootMonitor`, `forfan_touch_ctrl`) does NOT refer to a physical cooling fan. It is Topway's internal software/ODM division brand name (深圳市凡微科技有限公司 / "ForFan").
+   - The TS8667 hardware platform uses passive cooling via its heavy aluminum rear chassis heatsink.
+   - An active cooling fan node (`/sys/class/leds/fan/brightness`) is not populated on stock units unless an aftermarket PWM fan retrofit is attached. The `fan_governor` daemon idles safely without error flooding if the sysfs node is absent.
+
+5. **Serial Port Protection & Protocol Framing:**
+   - `/dev/ttyS0` is strictly targeted by default. Fallback to `/dev/ttyMT0` is explicitly blocked because `ttyMT0` is MediaTek's kernel debug printk console.
+   - Topway 0x2E binary frames are verified with a 5-state synchronous parser enforcing strict XOR checksum `(sum ^ 0xFF) == received_chk` with 100% unit-test coverage.
+
+6. **Settings API Bridge Security Architecture:**
+   - AIDL interface (`ICarSettingsService.aidl`) is guarded by `android.permission.BIND_CAR_SETTINGS_SERVICE`.
+   - Protection level is enforced as `signatureOrSystem` (not `normal`), preventing unauthorized third-party apps from binding.
+   - Runtime security checks in `onBind()` verify caller UID via `checkCallingOrSelfPermission()`.
+   - SELinux policy (`car_settings_bridge.te`) confines the app to standard Android property/broadcast IPC, isolating raw I2C and UART nodes to native daemons.

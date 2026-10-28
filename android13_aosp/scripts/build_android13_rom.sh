@@ -19,7 +19,8 @@ mkdir -p "$OUT_DIR"
 exec > >(tee "$REPORT_FILE") 2>&1
 
 echo "================================================================="
-echo " Topway TS8667 Android 13 Custom ROM Build Pipeline             "
+echo " Topway TS8667 Android 13 Automotive ROM Packaging Pipeline     "
+echo " (GSI System Base + Bionic Hardware Bridges + TWRP Flasher)     "
 echo " Date: $(date -u '+%Y-%m-%dT%H:%M:%SZ')                         "
 echo " Host: $(uname -s -m)                                           "
 echo "================================================================="
@@ -74,9 +75,12 @@ else
     cp "$BASE_DIR/thermal/fan_governor" "$BRIDGE_OUT/"
 fi
 
-# Copy init scripts
+# Copy init scripts and SELinux policies
 cp "$ZIP_TEMPLATE_DIR/bridge/ts_automotive.rc" "$BRIDGE_OUT/"
 cp "$ZIP_TEMPLATE_DIR/bridge/ts_automotive_init.sh" "$BRIDGE_OUT/"
+if [ -d "$BASE_DIR/sepolicy" ]; then
+    cp -r "$BASE_DIR/sepolicy" "$BRIDGE_OUT/"
+fi
 chmod 755 "$BRIDGE_OUT/ts_mcu_daemon" "$BRIDGE_OUT/bd3702_init" "$BRIDGE_OUT/fan_governor" "$BRIDGE_OUT/ts_automotive_init.sh"
 chmod 644 "$BRIDGE_OUT/ts_automotive.rc"
 

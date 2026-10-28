@@ -1,0 +1,50 @@
+# ==============================================================================
+# Topway TS8667 SELinux Policy: Automotive Services & Native Daemons
+# ==============================================================================
+
+# Car Settings Service Domain
+type car_settings_app, domain, coredomain;
+app_domain(car_settings_app)
+
+type car_settings_service, app_api_service, system_server_service, service_manager_type;
+allow car_settings_app car_settings_service:service_manager { add find };
+
+# Restrict hardware access: app communicates via IPC, broadcasts, and system properties
+allow car_settings_app sysfs_thermal:file r_file_perms;
+allow car_settings_app property_socket:sock_file write;
+allow car_settings_app init:unix_stream_socket connectto;
+set_prop(car_settings_app, system_prop)
+
+# ------------------------------------------------------------------------------
+# Native MCU Daemon (ts_mcu_daemon) Domain
+# ------------------------------------------------------------------------------
+type ts_mcu_daemon, domain, coredomain;
+type ts_mcu_daemon_exec, exec_type, file_type, system_file_type;
+init_daemon_domain(ts_mcu_daemon)
+
+# Confined to UART0 (/dev/ttyS0) and virtual input injection (/dev/uinput)
+allow ts_mcu_daemon tty_device:chr_file rw_file_perms;
+allow ts_mcu_daemon uhid_device:chr_file rw_file_perms;
+allow ts_mcu_daemon uinput_device:chr_file rw_file_perms;
+allow ts_mcu_daemon activity_service:service_manager find;
+
+# ------------------------------------------------------------------------------
+# ROHM BD3702FV Audio DSP Initializer (bd3702_init) Domain
+# ------------------------------------------------------------------------------
+type bd3702_init, domain, coredomain;
+type bd3702_init_exec, exec_type, file_type, system_file_type;
+init_daemon_domain(bd3702_init)
+
+# Confined strictly to I2C bus device nodes (/dev/i2c-5)
+allow bd3702_init i2c_device:chr_file rw_file_perms;
+
+# ------------------------------------------------------------------------------
+# Thermal Fan Governor (fan_governor) Domain
+# ------------------------------------------------------------------------------
+type fan_governor, domain, coredomain;
+type fan_governor_exec, exec_type, file_type, system_file_type;
+init_daemon_domain(fan_governor)
+
+# Confined to reading CPU thermal sensor and writing optional fan PWM node
+allow fan_governor sysfs_thermal:file r_file_perms;
+allow fan_governor sysfs_leds:file rw_file_perms;

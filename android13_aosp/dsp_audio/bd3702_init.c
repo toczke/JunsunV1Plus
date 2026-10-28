@@ -61,9 +61,11 @@ static int open_and_probe_i2c(int dry_run, char* out_path, size_t out_path_len) 
             continue;
         }
 
-        // Test non-destructive I2C transaction (query slave presence)
-        unsigned char test_reg = 0x01;
-        if (write(fd, &test_reg, 1) < 0) {
+        // Test non-destructive I2C read transaction (query slave presence without register modification)
+        // A single-byte read triggers an I2C read address cycle (0x40 << 1 | 1).
+        // If the chip is physically connected and ACKs its address, the read succeeds without altering any registers.
+        unsigned char probe_byte = 0;
+        if (read(fd, &probe_byte, 1) < 0) {
             // Slave NAK / not responding on this bus
             close(fd);
             continue;

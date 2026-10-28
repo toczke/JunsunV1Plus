@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteCallbackList;
@@ -240,6 +241,11 @@ public class CarSettingsService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
+        if (checkCallingOrSelfPermission("android.permission.BIND_CAR_SETTINGS_SERVICE")
+                != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Denied bind request from UID " + Binder.getCallingUid() + ": missing BIND_CAR_SETTINGS_SERVICE");
+            return null;
+        }
         return mBinder;
     }
 }
