@@ -1,11 +1,13 @@
 #!/sbin/sh
 # ==============================================================================
-# Topway TS8667 / Junsun V1 Plus - Android 13 AOSP Custom ROM Flasher
-# Standard TWRP Flashable ZIP update-binary
+# Topway TS8667 / Junsun V1 Plus - Hardened Android 13 AOSP Custom ROM Flasher
+# Safe TWRP update-binary with Device Check & Capacity Validation Gates
 # ==============================================================================
 
 OUTFD=$2
 ZIPFILE=$3
+
+MIN_REQUIRED_BYTES=1932656640 # Exact uncompressed size of AOSP 13 GSI system.img
 
 ui_print() {
     if [ -n "$OUTFD" ]; then
@@ -24,18 +26,53 @@ set_progress() {
 
 ui_print "====================================================="
 ui_print " Topway TS8667 / Junsun V1 Plus (Helio P65 MT6768)  "
-ui_print "       Android 13.0 AOSP Custom ROM Flasher         "
+ui_print "     Hardened Android 13 AOSP Custom ROM Flasher    "
 ui_print "====================================================="
 
 set_progress 0.05
 
-# 1. Unmount existing system partitions if mounted
+# ------------------------------------------------------------------------------
+# GATE 1: Hardware & Board Target Verification
+# ------------------------------------------------------------------------------
+ui_print "- Checking target hardware compatibility..."
+BOARD=$(getprop ro.product.board 2>/dev/null || true)
+HARDWARE=$(getprop ro.hardware 2>/dev/null || true)
+MODEL=$(getprop ro.product.model 2>/dev/null || true)
+
+ui_print "  Detected Board: $BOARD, Hardware: $HARDWARE, Model: $MODEL"
+
+VALID_TARGET=0
+case "$BOARD" in
+    *8667*|*mt6768*|*spm8667*) VALID_TARGET=1 ;;
+esac
+case "$HARDWARE" in
+    *mt6768*|*8667*) VALID_TARGET=1 ;;
+esac
+
+if [ "$VALID_TARGET" -eq 0 ]; then
+    # Secondary check via /proc/cpuinfo
+    if grep -Eqi "MT6768|MT8667" /proc/cpuinfo 2>/dev/null; then
+        VALID_TARGET=1
+    fi
+fi
+
+if [ "$VALID_TARGET" -eq 0 ]; then
+    ui_print "[-] ERROR: Incompatible hardware! This package is exclusively"
+    ui_print "    for Topway TS8667 / MediaTek MT6768 (Helio P65) platforms."
+    ui_print "    Aborting without modifying storage."
+    exit 1
+fi
+ui_print "[✓] Hardware platform verified: MediaTek TS8667 compatible."
+set_progress 0.10
+
+# ------------------------------------------------------------------------------
+# GATE 2: Locate and Map Dynamic Logical System Partition
+# ------------------------------------------------------------------------------
+ui_print "- Locating target logical system block device..."
 umount /system 2>/dev/null || true
 umount /system_root 2>/dev/null || true
 umount /tmp/sys_mnt 2>/dev/null || true
 
-# 2. Locate target logical block device for system
-ui_print "- Searching for logical system block device..."
 SYS_BLOCK=""
 for dev in \
     /dev/block/mapper/system \
@@ -48,9 +85,8 @@ for dev in \
     fi
 done
 
-if [ -z "$SYS_BLOCK" ]; then
-    ui_print "! Warning: /dev/block/mapper/system not mapped yet."
-    ui_print "! Attempting TWRP logical partition mapping..."
+if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
+    ui_print "! Activating TWRP logical partition mapping for super..."
     blockdev --setrw /dev/block/by-name/super 2>/dev/null || true
     if [ -b /dev/block/mapper/system ]; then
         SYS_BLOCK="/dev/block/mapper/system"
@@ -58,27 +94,54 @@ if [ -z "$SYS_BLOCK" ]; then
 fi
 
 if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
-    ui_print "[-] ERROR: Cannot locate system block device in TWRP!"
-    ui_print "    Please ensure 'System' is selectable in TWRP Mount menu."
+    ui_print "[-] ERROR: Cannot locate logical system block device!"
+    ui_print "    Ensure Dynamic Partitions (super) are mapped in TWRP."
     exit 1
 fi
 
-ui_print "[✓] Target system partition found: $SYS_BLOCK"
-set_progress 0.15
+ui_print "[✓] Target system block device: $SYS_BLOCK"
 
-# 3. Stream system.img directly from ZIP into block device
-ui_print "- Streaming Android 13 AOSP system image to flash..."
-ui_print "  This may take 1-2 minutes, please wait..."
-unzip -p "$ZIPFILE" system.img | dd of="$SYS_BLOCK" bs=4M
+# ------------------------------------------------------------------------------
+# GATE 3: Pre-Flash Partition Capacity Check
+# ------------------------------------------------------------------------------
+PART_SIZE=$(blockdev --getsize64 "$SYS_BLOCK" 2>/dev/null || echo 0)
+ui_print "  Allocated partition size: $PART_SIZE bytes (Required: $MIN_REQUIRED_BYTES bytes)"
+
+if [ "$PART_SIZE" -lt "$MIN_REQUIRED_BYTES" ]; then
+    ui_print "[-] ERROR: System partition is too small ($PART_SIZE < $MIN_REQUIRED_BYTES)!"
+    ui_print "    The Android 13 system image cannot fit into the current volume."
+    ui_print "    Aborting before modifying physical eMMC storage."
+    exit 1
+fi
+ui_print "[✓] Partition capacity check PASSED."
+set_progress 0.20
+
+# ------------------------------------------------------------------------------
+# STEP 4: Stream System Image to Block Device
+# ------------------------------------------------------------------------------
+ui_print "- Streaming Android 13 system image to flash..."
+ui_print "  Please wait, this will take approximately 60-90 seconds..."
+
+# Use dd with sync to flush write buffer
+if ! unzip -p "$ZIPFILE" system.img | dd of="$SYS_BLOCK" bs=4M conv=fsync 2>/dev/null; then
+    ui_print "[-] ERROR: Flashing system.img failed during write!"
+    ui_print "    EMERGENCY UNBRICK: Flash original output_images/recovery_stock.img"
+    ui_print "    or reflash OEM 8667.bin from a FAT32 USB flash drive."
+    exit 1
+fi
 sync
 
-ui_print "[✓] System image flashed successfully!"
+ui_print "[✓] System image flashed successfully."
 set_progress 0.70
 
-# 4. Mount new system partition to inject automotive hardware bridge
-ui_print "- Mounting Android 13 system to inject automotive bridge..."
+# ------------------------------------------------------------------------------
+# STEP 5: Mount System & Inject Hardened Automotive Bridges
+# ------------------------------------------------------------------------------
+ui_print "- Mounting Android 13 system to configure automotive integration..."
 mkdir -p /tmp/sys_mnt
-mount -t ext4 -o rw "$SYS_BLOCK" /tmp/sys_mnt || mount -o rw "$SYS_BLOCK" /tmp/sys_mnt
+if ! mount -t ext4 -o rw "$SYS_BLOCK" /tmp/sys_mnt 2>/dev/null; then
+    mount -o rw "$SYS_BLOCK" /tmp/sys_mnt 2>/dev/null || true
+fi
 
 TARGET_BIN="/tmp/sys_mnt/system/bin"
 TARGET_INIT="/tmp/sys_mnt/system/etc/init"
@@ -91,7 +154,7 @@ if [ ! -d "$TARGET_BIN" ]; then
 fi
 
 if [ -d "$TARGET_BIN" ]; then
-    ui_print "- Injecting native ARM64 automotive bridge binaries..."
+    ui_print "- Installing native automotive hardware daemons..."
     unzip -o "$ZIPFILE" 'bridge/*' -d /tmp/ >/dev/null 2>&1 || true
 
     cp /tmp/bridge/ts_mcu_daemon "$TARGET_BIN/" 2>/dev/null || true
@@ -126,16 +189,17 @@ if [ -d "$TARGET_BIN" ]; then
         if ! grep -q "ro.sf.hwrotation" "$TARGET_PROP"; then
             echo "ro.sf.hwrotation=0" >> "$TARGET_PROP"
             echo "debug.sf.latch_unsignaled=1" >> "$TARGET_PROP"
+            echo "ro.sf.lcd_density=192" >> "$TARGET_PROP"
         fi
     fi
-    ui_print "[✓] Automotive hardware bridge injected cleanly!"
+    ui_print "[✓] Automotive hardware bridges injected cleanly."
 else
     ui_print "! Warning: Could not locate /system/bin in mounted image."
 fi
 
 set_progress 0.90
 
-# 5. Clean unmount and sync
+# Clean unmount
 sync
 umount /tmp/sys_mnt 2>/dev/null || true
 rm -rf /tmp/bridge /tmp/sys_mnt 2>/dev/null || true
@@ -143,13 +207,11 @@ rm -rf /tmp/bridge /tmp/sys_mnt 2>/dev/null || true
 set_progress 1.00
 
 ui_print "====================================================="
-ui_print " [✓] Android 13 AOSP Custom ROM zainstalowany!      "
+ui_print " [✓] Android 13 AOSP Custom ROM Flashed Cleanly!     "
 ui_print "====================================================="
-ui_print "WAZNE KROKI KONCOWE:"
-ui_print "1. Wykonaj w TWRP: Wipe -> Format Data (wpisz 'yes')."
-ui_print "2. Wybierz Reboot System."
-ui_print "3. Ciesz sie czystym Androidem 13 ze sprawnymi"
-ui_print "   przyciskami z kierownicy i dzwiekiem!"
+ui_print "MANDATORY NEXT STEPS:"
+ui_print "1. In TWRP, go to: Wipe -> Format Data (type 'yes')."
+ui_print "2. Select: Reboot System."
 ui_print "====================================================="
 
 exit 0

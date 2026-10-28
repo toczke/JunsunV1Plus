@@ -40,6 +40,19 @@
                 android:value="-50" />
         </activity>
 
+        <service
+            android:name=".CarSettingsService"
+            android:exported="true"
+            android:permission="android.permission.BIND_CAR_SETTINGS_SERVICE">
+            <intent-filter>
+                <action android:name="com.topway.carsettingsbridge.BIND_SERVICE" />
+            </intent-filter>
+        </service>
+
     </application>
+
+    <permission
+        android:name="android.permission.BIND_CAR_SETTINGS_SERVICE"
+        android:protectionLevel="normal" />
 
 </manifest>

@@ -1,11 +1,11 @@
 /*
  * ==============================================================================
- * Topway TS8667 / Junsun V1 Plus - Native Automotive MCU Daemon (ts_mcu_daemon)
+ * Topway TS8667 / Junsun V1 Plus - Hardened Native MCU Daemon (ts_mcu_daemon)
  * ==============================================================================
- * Connects to the on-board STM32/GD32 MCU via /dev/ttyMT1 @ 115200 baud.
- * Decodes Topway 0x2E binary frames.
- * Injects Linux uinput key events for steering wheel controls (SWC).
- * Dispatches Android system intents for Reverse Gear and Headlights (Dark mode).
+ * Connects to on-board Topway G6-TS MCU via /dev/ttyS0 (fallback: /dev/ttyMT0/1).
+ * Decodes Topway 0x2E binary protocol frames with strict XOR checksum validation.
+ * Injects Linux kernel uinput key events for steering wheel controls (SWC).
+ * Dispatches Android system intents using /system/bin/sh (Bionic compatible).
  * ==============================================================================
  */
 
@@ -18,13 +18,19 @@
 #include <termios.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <linux/input.h>
 #include <linux/uinput.h>
 #include <sys/stat.h>
 
-#define MCU_SERIAL_PORT "/dev/ttyMT1"
-#define MCU_BAUDRATE B115200
 #define PROTOCOL_HEADER 0x2E
+#define MCU_BAUDRATE    B115200
+
+static const char* const SERIAL_CANDIDATES[] = {
+    "/dev/ttyS0",  // Discovered in vendor libts67xhw.so (c_uartopen: /dev/ttyS%d, 0)
+    "/dev/ttyMT0", // MediaTek primary hardware UART
+    "/dev/ttyMT1"  // MediaTek secondary hardware UART
+};
 
 static int g_serial_fd = -1;
 static int g_uinput_fd = -1;
@@ -35,13 +41,38 @@ static void sig_handler(int sig) {
     g_running = 0;
 }
 
+/*
+ * Android-native command execution using /system/bin/sh.
+ * Completely avoids glibc's hardcoded dependency on non-existent /bin/sh.
+ */
+static void android_exec(const char* cmd) {
+    if (!cmd || !*cmd) return;
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child process
+        const char* sh_path = "/system/bin/sh";
+        if (access(sh_path, X_OK) != 0) {
+            sh_path = "/bin/sh"; // Fallback for host testing
+        }
+        execl(sh_path, "sh", "-c", cmd, (char*)NULL);
+        _exit(127);
+    } else if (pid > 0) {
+        // Detach child / reap asynchronously via waitpid with WNOHANG
+        int status;
+        waitpid(pid, &status, WNOHANG);
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Linux uinput Virtual Keyboard Setup
 // -----------------------------------------------------------------------------
-static int init_uinput() {
+static int init_uinput(void) {
     int fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
     if (fd < 0) {
-        perror("Failed to open /dev/uinput");
+        fd = open("/dev/input/uinput", O_WRONLY | O_NONBLOCK);
+    }
+    if (fd < 0) {
+        perror("[ts_mcu_daemon] Failed to open /dev/uinput");
         return -1;
     }
 
@@ -49,7 +80,7 @@ static int init_uinput() {
     ioctl(fd, UI_SET_EVBIT, EV_SYN);
 
     // Register automotive SWC keys
-    int keys[] = {
+    static const int keys[] = {
         KEY_VOLUMEUP,
         KEY_VOLUMEDOWN,
         KEY_MUTE,
@@ -71,18 +102,18 @@ static int init_uinput() {
     struct uinput_setup usetup;
     memset(&usetup, 0, sizeof(usetup));
     usetup.id.bustype = BUS_USB;
-    usetup.id.vendor  = 0x18d1; // Google
+    usetup.id.vendor  = 0x18d1; // Google Inc.
     usetup.id.product = 0x2026;
-    strcpy(usetup.name, "Topway TS8667 Automotive SWC");
+    strncpy(usetup.name, "Topway TS8667 Automotive SWC", sizeof(usetup.name) - 1);
 
     if (ioctl(fd, UI_DEV_SETUP, &usetup) < 0) {
-        perror("UI_DEV_SETUP failed");
+        perror("[ts_mcu_daemon] UI_DEV_SETUP failed");
         close(fd);
         return -1;
     }
 
     if (ioctl(fd, UI_DEV_CREATE) < 0) {
-        perror("UI_DEV_CREATE failed");
+        perror("[ts_mcu_daemon] UI_DEV_CREATE failed");
         close(fd);
         return -1;
     }
@@ -100,80 +131,92 @@ static void emit_key(int fd, int keycode) {
     ev.type = EV_KEY;
     ev.code = keycode;
     ev.value = 1;
-    write(fd, &ev, sizeof(ev));
+    if (write(fd, &ev, sizeof(ev)) != sizeof(ev)) return;
 
-    // Sync
     memset(&ev, 0, sizeof(ev));
     ev.type = EV_SYN;
     ev.code = SYN_REPORT;
     ev.value = 0;
-    write(fd, &ev, sizeof(ev));
+    if (write(fd, &ev, sizeof(ev)) != sizeof(ev)) return;
 
-    usleep(25000); // 25ms key press duration
+    usleep(25000); // 25ms standard debounce duration
 
     // Key Release
     memset(&ev, 0, sizeof(ev));
     ev.type = EV_KEY;
     ev.code = keycode;
     ev.value = 0;
-    write(fd, &ev, sizeof(ev));
+    if (write(fd, &ev, sizeof(ev)) != sizeof(ev)) return;
 
-    // Sync
     memset(&ev, 0, sizeof(ev));
     ev.type = EV_SYN;
     ev.code = SYN_REPORT;
     ev.value = 0;
-    write(fd, &ev, sizeof(ev));
+    if (write(fd, &ev, sizeof(ev)) != sizeof(ev)) return;
 
-    printf("[ts_mcu_daemon] Emitted keycode: %d\n", keycode);
+    printf("[ts_mcu_daemon] SWC Key emitted: Linux code %d\n", keycode);
 }
 
 // -----------------------------------------------------------------------------
-// UART Serial Port Setup
+// Serial Port Discovery & Configuration
 // -----------------------------------------------------------------------------
-static int init_serial(const char* port) {
-    int fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
-    if (fd < 0) {
-        perror("Failed to open serial port");
-        return -1;
+static int open_candidate_serial(void) {
+    for (size_t i = 0; i < sizeof(SERIAL_CANDIDATES)/sizeof(SERIAL_CANDIDATES[0]); i++) {
+        const char* port = SERIAL_CANDIDATES[i];
+        if (access(port, R_OK | W_OK) != 0) {
+            continue;
+        }
+
+        int fd = open(port, O_RDWR | O_NOCTTY | O_NDELAY);
+        if (fd < 0) {
+            continue;
+        }
+
+        struct termios options;
+        if (tcgetattr(fd, &options) < 0) {
+            close(fd);
+            continue;
+        }
+
+        cfsetispeed(&options, MCU_BAUDRATE);
+        cfsetospeed(&options, MCU_BAUDRATE);
+
+        options.c_cflag |= (CLOCAL | CREAD);
+        options.c_cflag &= ~PARENB;
+        options.c_cflag &= ~CSTOPB;
+        options.c_cflag &= ~CSIZE;
+        options.c_cflag |= CS8;
+
+        options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+        options.c_iflag &= ~(IXON | IXOFF | IXANY);
+        options.c_iflag &= ~(INLCR | ICRNL | IGNCR);
+        options.c_oflag &= ~OPOST;
+
+        options.c_cc[VMIN]  = 1;
+        options.c_cc[VTIME] = 1;
+
+        tcflush(fd, TCIFLUSH);
+        if (tcsetattr(fd, TCSANOW, &options) < 0) {
+            close(fd);
+            continue;
+        }
+
+        printf("[ts_mcu_daemon] Successfully connected to MCU serial port: %s @ 115200 8N1\n", port);
+        return fd;
     }
-
-    struct termios options;
-    tcgetattr(fd, &options);
-
-    cfsetispeed(&options, MCU_BAUDRATE);
-    cfsetospeed(&options, MCU_BAUDRATE);
-
-    options.c_cflag |= (CLOCAL | CREAD);
-    options.c_cflag &= ~PARENB;
-    options.c_cflag &= ~CSTOPB;
-    options.c_cflag &= ~CSIZE;
-    options.c_cflag |= CS8;
-
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    options.c_iflag &= ~(IXON | IXOFF | IXANY);
-    options.c_iflag &= ~(INLCR | ICRNL | IGNCR);
-    options.c_oflag &= ~OPOST;
-
-    options.c_cc[VMIN]  = 1;
-    options.c_cc[VTIME] = 1;
-
-    tcflush(fd, TCIFLUSH);
-    tcsetattr(fd, TCSANOW, &options);
-
-    printf("[ts_mcu_daemon] Serial port %s opened at 115200 baud\n", port);
-    return fd;
+    return -1;
 }
 
 // -----------------------------------------------------------------------------
-// Topway Protocol Parser
+// Topway Protocol Frame Handler
 // -----------------------------------------------------------------------------
 static int s_prev_reverse = -1;
-static int s_prev_illum = -1;
+static int s_prev_illum   = -1;
 
-static void handle_mcu_packet(unsigned char cmd, unsigned char* data, int len) {
-    // 1. Steering Wheel Key Press
+static void handle_mcu_packet(unsigned char cmd, const unsigned char* data, int len) {
+    // 1. Steering Wheel Controls
     if (cmd == 0x01 || cmd == 0x02 || cmd == 0x11) {
+        if (len < 1) return;
         unsigned char key_val = data[0];
         switch (key_val) {
             case 0x01: emit_key(g_uinput_fd, KEY_VOLUMEUP); break;
@@ -188,59 +231,62 @@ static void handle_mcu_packet(unsigned char cmd, unsigned char* data, int len) {
             case 0x0A: emit_key(g_uinput_fd, KEY_VOICECOMMAND); break;
             case 0x0B: emit_key(g_uinput_fd, KEY_HOMEPAGE); break;
             case 0x0C: emit_key(g_uinput_fd, KEY_BACK); break;
-            default: break;
+            default:
+                printf("[ts_mcu_daemon] Unmapped SWC keycode byte: 0x%02X\n", key_val);
+                break;
         }
     }
-    // 2. Vehicle State (Reverse, Headlights ILLUM, Handbrake)
+    // 2. Vehicle Telemetry & State (Reverse gear, Headlights ILLUM)
     else if (cmd == 0x10 || cmd == 0x20) {
         if (len >= 1) {
-            int reverse = (data[0] & 0x01); // Bit 0: Reverse Gear
-            int illum   = (data[0] & 0x02); // Bit 1: Headlights On
+            int reverse = (data[0] & 0x01) ? 1 : 0; // Bit 0: Reverse Gear
+            int illum   = (data[0] & 0x02) ? 1 : 0; // Bit 1: Headlights On
 
-            // Trigger Reverse Intent
             if (reverse != s_prev_reverse) {
                 s_prev_reverse = reverse;
+                printf("[ts_mcu_daemon] REVERSE GEAR %s\n", reverse ? "ENGAGED" : "DISENGAGED");
                 if (reverse) {
-                    printf("[ts_mcu_daemon] REVERSE GEAR ENGAGED!\n");
-                    system("am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status true 2>/dev/null &");
+                    android_exec("/system/bin/am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status true");
                 } else {
-                    printf("[ts_mcu_daemon] REVERSE GEAR DISENGAGED.\n");
-                    system("am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status false 2>/dev/null &");
+                    android_exec("/system/bin/am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status false");
                 }
             }
 
-            // Trigger Dark Mode (Day / Night sync)
             if (illum != s_prev_illum) {
                 s_prev_illum = illum;
+                printf("[ts_mcu_daemon] HEADLIGHTS %s -> Switching Theme\n", illum ? "ON" : "OFF");
                 if (illum) {
-                    printf("[ts_mcu_daemon] HEADLIGHTS ON -> Enabling Dark Mode\n");
-                    system("cmd uimode night yes 2>/dev/null &");
+                    android_exec("/system/bin/cmd uimode night yes");
+                    android_exec("/system/bin/am broadcast -a com.topway.action.ILLUM_CHANGED --ez illum true");
                 } else {
-                    printf("[ts_mcu_daemon] HEADLIGHTS OFF -> Enabling Light Mode\n");
-                    system("cmd uimode night no 2>/dev/null &");
+                    android_exec("/system/bin/cmd uimode night no");
+                    android_exec("/system/bin/am broadcast -a com.topway.action.ILLUM_CHANGED --ez illum false");
                 }
             }
         }
     }
 }
 
+// -----------------------------------------------------------------------------
+// Main Event Loop with Strict Checksum Validation
+// -----------------------------------------------------------------------------
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
 
     printf("=====================================================\n");
-    printf(" Topway TS8667 Automotive MCU Daemon v1.0 (Android 13)\n");
+    printf(" Topway TS8667 Automotive MCU Daemon v2.0 (Hardened) \n");
     printf("=====================================================\n");
 
     g_uinput_fd = init_uinput();
     if (g_uinput_fd < 0) {
-        fprintf(stderr, "Warning: Running without uinput virtual keyboard.\n");
+        fprintf(stderr, "[ts_mcu_daemon] Warning: Operating without uinput virtual keyboard.\n");
     }
 
-    g_serial_fd = init_serial(MCU_SERIAL_PORT);
+    g_serial_fd = open_candidate_serial();
     if (g_serial_fd < 0) {
-        fprintf(stderr, "Cannot open %s. Retrying in background...\n", MCU_SERIAL_PORT);
+        fprintf(stderr, "[ts_mcu_daemon] Serial port not accessible yet. Will retry in background...\n");
     }
 
     unsigned char buf[256];
@@ -254,7 +300,7 @@ int main(int argc, char** argv) {
     while (g_running) {
         if (g_serial_fd < 0) {
             sleep(2);
-            g_serial_fd = init_serial(MCU_SERIAL_PORT);
+            g_serial_fd = open_candidate_serial();
             continue;
         }
 
@@ -267,7 +313,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < n; i++) {
             unsigned char b = buf[i];
             switch (state) {
-                case 0: // Header
+                case 0: // Header Synchronization
                     if (b == PROTOCOL_HEADER) {
                         state = 1;
                         chk_calc = 0;
@@ -278,7 +324,7 @@ int main(int argc, char** argv) {
                     chk_calc += b;
                     state = 2;
                     break;
-                case 2: // Command
+                case 2: // Command Byte
                     packet_cmd = b;
                     chk_calc += b;
                     data_idx = 0;
@@ -288,8 +334,8 @@ int main(int argc, char** argv) {
                         state = 4;
                     }
                     break;
-                case 3: // Data
-                    if (data_idx < 127) {
+                case 3: // Data Payload
+                    if (data_idx < (int)sizeof(packet_data)) {
                         packet_data[data_idx++] = b;
                         chk_calc += b;
                     }
@@ -297,12 +343,15 @@ int main(int argc, char** argv) {
                         state = 4;
                     }
                     break;
-                case 4: // Checksum
-                    chk_calc = chk_calc ^ 0xFF;
-                    if (chk_calc == b || 1) { // Accept frame
+                case 4: // Strict Checksum Verification (NO UNCONDITIONAL BYPASS)
+                    chk_calc = (unsigned char)(chk_calc ^ 0xFF);
+                    if (chk_calc == b) {
                         handle_mcu_packet(packet_cmd, packet_data, data_idx);
+                    } else {
+                        fprintf(stderr, "[ts_mcu_daemon] Checksum MISMATCH! Calc: 0x%02X, Received: 0x%02X (Cmd: 0x%02X, Len: %d)\n",
+                                chk_calc, b, packet_cmd, packet_len);
                     }
-                    state = 0;
+                    state = 0; // Reset state machine to wait for next header
                     break;
             }
         }
@@ -314,6 +363,6 @@ int main(int argc, char** argv) {
         close(g_uinput_fd);
     }
 
-    printf("[ts_mcu_daemon] Stopped cleanly.\n");
+    printf("[ts_mcu_daemon] Terminated cleanly.\n");
     return 0;
 }

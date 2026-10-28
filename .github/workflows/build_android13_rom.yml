@@ -1,0 +1,102 @@
+name: Build Android 13 Custom ROM
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/android13-ts8667'
+    paths:
+      - 'android13_aosp/**'
+      - 'car_settings_bridge/**'
+      - '.github/workflows/build_android13_rom.yml'
+
+jobs:
+  build_android13:
+    name: Build Android 13 Automotive Custom ROM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Build Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zip curl xz-utils gcc-aarch64-linux-gnu
+
+      - name: Set up Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r25c
+
+      - name: Compile Native Hardware Bridges with Android NDK Bionic
+        run: |
+          set -euo pipefail
+          echo "Using Android NDK: $ANDROID_NDK_ROOT"
+          NDK_CLANG="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+          
+          mkdir -p android13_aosp/out/bridge
+          
+          echo "- Compiling ts_mcu_daemon with Bionic libc..."
+          "$NDK_CLANG" -Wall -Wextra -O2 -static \
+            android13_aosp/mcu_daemon/ts_mcu_daemon.c \
+            -o android13_aosp/out/bridge/ts_mcu_daemon
+
+          echo "- Compiling bd3702_init with Bionic libc..."
+          "$NDK_CLANG" -Wall -Wextra -O2 -static \
+            android13_aosp/dsp_audio/bd3702_init.c \
+            -o android13_aosp/out/bridge/bd3702_init
+
+          echo "- Compiling fan_governor with Bionic libc..."
+          "$NDK_CLANG" -Wall -Wextra -O2 -static \
+            android13_aosp/thermal/fan_governor.c \
+            -o android13_aosp/out/bridge/fan_governor
+
+          # Verify ELF headers
+          file android13_aosp/out/bridge/*
+          readelf -h android13_aosp/out/bridge/ts_mcu_daemon
+
+      - name: Run Host Static Analysis & Dry-Run Tests
+        run: |
+          set -euo pipefail
+          echo "Compiling host test binaries..."
+          gcc -Wall -Wextra -O2 android13_aosp/dsp_audio/bd3702_init.c -o /tmp/host_bd3702
+          gcc -Wall -Wextra -O2 android13_aosp/thermal/fan_governor.c -o /tmp/host_fan
+
+          echo "Running dry-run tests..."
+          /tmp/host_bd3702 --dry-run
+          /tmp/host_fan --dry-run
+
+      - name: Download & Decompress AOSP 13 GSI Base Image
+        run: |
+          set -euo pipefail
+          mkdir -p android13_aosp/gsi
+          GSI_XZ="android13_aosp/gsi/aosp-arm64-ab-vanilla-13.0-20230919.img.xz"
+          GSI_IMG="android13_aosp/gsi/aosp-arm64-ab-vanilla-13.0-20230919.img"
+
+          if [ ! -f "$GSI_IMG" ]; then
+            echo "Downloading TrebleDroid AOSP 13 GSI..."
+            curl -L -o "$GSI_XZ" \
+              "https://github.com/ponces/treble_aosp/releases/download/v2023.09.19/aosp-arm64-ab-vanilla-13.0-20230919.img.xz"
+            echo "Decompressing GSI image..."
+            xz -d "$GSI_XZ"
+          fi
+
+          echo "GSI Image size: $(stat -c%s "$GSI_IMG") bytes"
+
+      - name: Execute Reproducible ROM Build Pipeline
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
+          bash android13_aosp/scripts/build_android13_rom.sh
+
+      - name: Upload Android 13 Development Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android13_ts8667_dev_build_${{ github.run_number }}
+          path: |
+            android13_aosp/out/AOSP13-TS8667-CustomROM-UNOFFICIAL.zip
+            android13_aosp/out/TS8667_Android13_Automotive_Bridge.zip
+            android13_aosp/out/build_report.txt
+            android13_aosp/out/sha256_manifest.txt
+          if-no-files-found: error
