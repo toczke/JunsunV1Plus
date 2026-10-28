@@ -107,9 +107,10 @@ jobs:
 
           cp "$OUT_DIR/recovery.img" ./twrp_raw.img
 
-          # Locate avbtool using robust bash array pattern avoiding tilde expansion issues
+          # Locate avbtool and patch legacy Python 2 long integer syntax (2L**) for Python 3 compatibility
           AVBTOOL_SCRIPT="$HOME/twrp/external/avb/avbtool"
           if [ -f "$AVBTOOL_SCRIPT" ]; then
+            sed -i 's/2L\*\*/2\*\*/g' "$AVBTOOL_SCRIPT"
             avbtool_cmd=(python3 "$AVBTOOL_SCRIPT")
           elif command -v avbtool >/dev/null 2>&1; then
             avbtool_cmd=(avbtool)
