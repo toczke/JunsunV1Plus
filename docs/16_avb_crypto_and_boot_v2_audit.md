@@ -138,93 +138,89 @@ sha256 digest of boot.img does not match digest in descriptor
 
 ---
 
-## 5. Local Reproducible Validation Logs
+## 5. Local Structural Boundary & Header Field Validation
 
-To provide verifiable artifacts rather than author declarations, the following Python script reproduces the exact bit-level validation on both stock and TWRP images:
+To provide verifiable artifacts rather than author declarations, the following Python script reproduces the structural boundary, offset alignment, DTBO table, and DTB table entry 0 FDT validation on both stock and TWRP images.
 
+### 5.1 Verification Script (`tools/validate_boot_v2.py`)
 ```python
-import os, struct, sys
-
+import struct, os, sys
 
 def validate_v2_image(path):
-  with open(path, 'rb') as f:
-    hdr = f.read(2048)
-    magic, k_sz, k_addr, r_sz, r_addr, s_sz, s_addr, tags_addr, page_sz, ver = (
-        struct.unpack('<8s9I', hdr[:44])
-    )
-    dtbo_sz, dtbo_off = struct.unpack('<IQ', hdr[1632:1644])
-    hdr_sz, dtb_sz, dtb_addr = struct.unpack('<IIQ', hdr[1644:1660])
+    with open(path, "rb") as f:
+        hdr = f.read(2048)
+        magic, k_sz, k_addr, r_sz, r_addr, s_sz, s_addr, tags_addr, page_sz, ver = struct.unpack("<8s9I", hdr[:44])
+        dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
+        hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
 
-    assert magic == b'ANDROID!', 'Magic mismatch'
-    assert ver == 2, f'Header version {ver} != 2'
-    assert page_sz in (2048, 4096), f'Unexpected page size {page_sz}'
-    assert hdr_sz >= 1660, f'Invalid header size {hdr_sz}'
-    assert k_sz > 0 and r_sz > 0 and dtbo_sz > 0 and dtb_sz > 0, (
-        'Zero-length section detected'
-    )
+        assert magic == b"ANDROID!", "Magic mismatch"
+        assert ver == 2, f"Header version {ver} != 2"
+        assert page_sz in (2048, 4096), f"Unexpected page size {page_sz}"
+        assert hdr_sz >= 1660, f"Invalid header size {hdr_sz}"
+        assert k_sz > 0 and r_sz > 0 and dtbo_sz > 0 and dtb_sz > 0, "Zero-length section detected"
 
-    def pad(sz):
-      return ((sz + page_sz - 1) // page_sz) * page_sz
+        def pad(sz): return ((sz + page_sz - 1) // page_sz) * page_sz
 
-    off_k = page_sz
-    off_r = off_k + pad(k_sz)
-    off_s = off_r + pad(r_sz)
+        off_k = page_sz
+        off_r = off_k + pad(k_sz)
+        off_s = off_r + pad(r_sz)
 
-    expected_dtbo_off = off_s + pad(s_sz)
-    assert dtbo_off == expected_dtbo_off, (
-        f'DTBO offset mismatch: declared {dtbo_off} != expected'
-        f' {expected_dtbo_off}'
-    )
+        # 1. Declared recovery_dtbo_offset validation
+        expected_dtbo_off = off_s + pad(s_sz)
+        assert dtbo_off == expected_dtbo_off, f"DTBO offset mismatch: declared {dtbo_off} != expected {expected_dtbo_off}"
 
-    f.seek(dtbo_off)
-    dtbo_hdr = f.read(32)
-    dtbo_magic, dtbo_total_sz = struct.unpack('>II', dtbo_hdr[:8])
-    assert dtbo_magic == 0xD7B7AB1E, (
-        f'Invalid DTBO table magic: 0x{dtbo_magic:08x}'
-    )
-    assert dtbo_total_sz == dtbo_sz, (
-        f'DTBO total_size mismatch: table {dtbo_total_sz} != header {dtbo_sz}'
-    )
+        # 2. DTBO Table Header & total_size validation
+        f.seek(dtbo_off)
+        dtbo_hdr = f.read(32)
+        dtbo_magic, dtbo_total_sz = struct.unpack(">II", dtbo_hdr[:8])
+        assert dtbo_magic == 0xd7b7ab1e, f"Invalid DTBO table magic: 0x{dtbo_magic:08x}"
+        assert dtbo_total_sz == dtbo_sz, f"DTBO total_size mismatch: table {dtbo_total_sz} != header {dtbo_sz}"
 
-    off_dtb = dtbo_off + pad(dtbo_sz)
-    f.seek(off_dtb)
-    dtb_hdr = f.read(32)
-    dtb_magic, dtb_total_sz = struct.unpack('>II', dtb_hdr[:8])
-    assert dtb_magic in (0xD7B7AB1E, 0xD00DFEED), (
-        f'Invalid DTB magic: 0x{dtb_magic:08x}'
-    )
-    assert dtb_total_sz == dtb_sz, (
-        f'DTB total_size mismatch: table {dtb_total_sz} != header {dtb_sz}'
-    )
+        # 3. DTB Table Header, Entry 0, and FDT Magic validation
+        off_dtb = dtbo_off + pad(dtbo_sz)
+        f.seek(off_dtb)
+        dtb_hdr = f.read(32)
+        dtb_magic, dtb_total_sz, _, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_hdr[:24])
+        assert dtb_magic == 0xd7b7ab1e, f"Invalid DTB magic: 0x{dtb_magic:08x}"
+        assert dtb_total_sz == dtb_sz, f"DTB total_size mismatch: table {dtb_total_sz} != header {dtb_sz}"
+        assert entry_count >= 1, "DTB table has no entries"
 
-    total_payload = off_dtb + pad(dtb_sz)
-    f.seek(0, 2)
-    file_sz = f.tell()
-    assert file_sz >= total_payload, (
-        f'File size {file_sz} < payload {total_payload}'
-    )
-    return {
-        'page_sz': page_sz,
-        'hdr_sz': hdr_sz,
-        'k_sz': k_sz,
-        'r_sz': r_sz,
-        'dtbo_off': dtbo_off,
-        'dtbo_sz': dtbo_sz,
-        'dtb_off': off_dtb,
-        'dtb_sz': dtb_sz,
-        'payload': total_payload,
-        'file_sz': file_sz,
-    }
+        # Read Entry 0 pointing to FDT payload
+        f.seek(off_dtb + entries_off)
+        entry0 = f.read(entry_sz)
+        entry0_sz, entry0_off = struct.unpack(">II", entry0[:8])
+        f.seek(off_dtb + entry0_off)
+        fdt_magic, fdt_totalsize = struct.unpack(">II", f.read(8))
+        assert fdt_magic == 0xd00dfeed, f"Invalid FDT magic: 0x{fdt_magic:08x}"
+        assert fdt_totalsize == entry0_sz, f"FDT totalsize {fdt_totalsize} != entry dt_size {entry0_sz}"
 
+        total_payload = off_dtb + pad(dtb_sz)
+        f.seek(0, 2)
+        file_sz = f.tell()
+        assert file_sz >= total_payload, f"File size {file_sz} < payload {total_payload}"
+        return {
+            "page_sz": page_sz, "hdr_sz": hdr_sz,
+            "k_sz": k_sz, "r_sz": r_sz,
+            "dtbo_off": dtbo_off, "dtbo_sz": dtbo_sz,
+            "dtb_off": off_dtb, "dtb_sz": dtb_sz,
+            "fdt_offset": off_dtb + entry0_off, "fdt_size": fdt_totalsize,
+            "payload": total_payload, "file_sz": file_sz
+        }
 
-print('Stock Recovery:', validate_v2_image('output_images/recovery_stock.img'))
-print('TWRP Recovery:', validate_v2_image('output_images/twrp_fixed_32mb.img'))
+print("Stock Recovery:", validate_v2_image("output_images/recovery_stock.img"))
+print("TWRP Recovery:", validate_v2_image("output_images/twrp_fixed_32mb.img"))
 ```
 
-**Executed Output:**
+### 5.2 Input Files & Reference Checksums
+| File | Size (Bytes) | SHA-256 Checksum |
+| :--- | :--- | :--- |
+| `output_images/recovery_stock.img` | 33,554,432 | `7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f` |
+| `output_images/twrp_fixed_32mb.img` | 33,554,432 | `1acae228adeb10e97f475679e0959ce0acba312184c88a3b644ed164a5b2306b` |
+
+### 5.3 Executed Output
 ```text
-Stock Recovery: {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 6586823, 'dtbo_off': 17922048, 'dtbo_sz': 48358, 'dtb_off': 17971200, 'dtb_sz': 105691, 'payload': 18077696, 'file_sz': 33554432}
-TWRP Recovery: {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 18494707, 'dtbo_off': 29829120, 'dtbo_sz': 48358, 'dtb_off': 29878272, 'dtb_sz': 105691, 'payload': 29984768, 'file_sz': 33554432}
+Stock Recovery: {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 6586823, 'dtbo_off': 17922048, 'dtbo_sz': 48358, 'dtb_off': 17971200, 'dtb_sz': 105691, 'fdt_offset': 17971264, 'fdt_size': 105627, 'payload': 18077696, 'file_sz': 33554432}
+TWRP Recovery:  {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 18494707, 'dtbo_off': 29829120, 'dtbo_sz': 48358, 'dtb_off': 29878272, 'dtb_sz': 105691, 'fdt_offset': 29878336, 'fdt_size': 105627, 'payload': 29984768, 'file_sz': 33554432}
 ```
 
 ---

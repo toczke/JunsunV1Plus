@@ -65,8 +65,9 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           set +e
           source build/envsetup.sh
-          set -euo pipefail
           lunch omni_ts8667-eng || lunch twrp_ts8667-eng
+          set -e
+          set -o pipefail
           BUILD_LOG=$(mktemp)
           if ! mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$BUILD_LOG"; then
             if grep -Fq "could not make way for new symlink: root/vendor" "$BUILD_LOG"; then
@@ -166,16 +167,28 @@ jobs:
               else:
                   off_dtb = off_s + pad(s_sz)
 
-              # Validate DTB structure and declared size
+              # Validate DTB structure, entry 0, and internal FDT payload
               if dtb_sz > 0:
                   f.seek(off_dtb)
                   dtb_table_hdr = f.read(32)
-                  dtb_magic, dtb_total_sz = struct.unpack(">II", dtb_table_hdr[:8])
-                  if dtb_magic not in (0xd7b7ab1e, 0xd00dfeed):
-                      raise ValueError(f"Invalid DTB magic at {off_dtb}: 0x{dtb_magic:08x}")
+                  dtb_magic, dtb_total_sz, _, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_table_hdr[:24])
+                  if dtb_magic != 0xd7b7ab1e:
+                      raise ValueError(f"Invalid DTB magic at {off_dtb}: 0x{dtb_magic:08x} (expected 0xd7b7ab1e)")
                   if dtb_total_sz != dtb_sz:
                       raise ValueError(f"DTB total_size mismatch: table header {dtb_total_sz} != boot header {dtb_sz}")
-                  print(f"Validated DTB table at {off_dtb}: magic=0x{dtb_magic:08x}, size={dtb_total_sz} bytes")
+                  if entry_count < 1:
+                      raise ValueError("DTB table contains 0 entries")
+                  
+                  # Verify Entry 0 and FDT payload at internal offset
+                  f.seek(off_dtb + entries_off)
+                  entry0_sz, entry0_off = struct.unpack(">II", f.read(8))
+                  f.seek(off_dtb + entry0_off)
+                  fdt_magic, fdt_totalsize = struct.unpack(">II", f.read(8))
+                  if fdt_magic != 0xd00dfeed:
+                      raise ValueError(f"Invalid FDT magic at DTB entry 0 offset +{entry0_off}: 0x{fdt_magic:08x} (expected 0xd00dfeed)")
+                  if fdt_totalsize != entry0_sz:
+                      raise ValueError(f"FDT totalsize {fdt_totalsize} != entry 0 dt_size {entry0_sz}")
+                  print(f"Validated DTB table at {off_dtb}: size={dtb_total_sz}, entry 0 FDT at +{entry0_off} (size={fdt_totalsize} bytes)")
                   total_payload = off_dtb + pad(dtb_sz)
               else:
                   total_payload = off_dtb
