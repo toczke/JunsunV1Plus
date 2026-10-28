@@ -123,6 +123,24 @@ recovery: Successfully verified sha256 hash of /tmp/verify_twrp/recovery.img for
 3. **Hash Descriptor Verification:** Verifies that the SHA-256 hash of the exact binary payload (`29,984,768` bytes) matches the hash stored in the signed descriptor with zero bit discrepancy.
 4. **Partition Size Integrity:** Verifies the overall image length is exactly 33,554,432 bytes (32 MiB).
 
+### 3.3 Duality of AVB Signing: CI Mathematical Integrity vs. Device Bootloader Trust
+It is crucial to distinguish between two completely separate verification realms:
+1. **CI Pipeline Mathematical Verification:** Signing with the standard AOSP test key (`external/avb/test/data/testkey_rsa2048.pem`) in CI validates the formatting toolchain, footer geometry, vbmeta offsets, and cryptographic hash descriptor math. It proves that the image is mathematically consistent with `avbtool`.
+2. **Hardware Bootloader Trust Boundary:** The LittleKernel (LK) bootloader embedded in the MediaTek MT8667 ROM does **NOT** trust this AOSP test key. MediaTek LK relies on OEM public keys burned into efuses or embedded in OEM LittleKernel binary.
+   - **Operational Hypothesis in `orange` State:** The TS8667 head unit operates with `[ro.boot.verifiedbootstate]: [orange]` and `[ro.boot.flash.locked]: [0]`. In standard MediaTek LK implementations, the `orange` state instructs the bootloader to warn the user but bypass enforcement of OEM cryptographic signatures, allowing unsigned or testkey-signed partitions to boot.
+   - **Crucial Warning:** This LittleKernel bypass is a platform hypothesis that requires empirical verification on physical hardware. Under no circumstances does a successful `avbtool verify_image` in CI constitute proof that the physical unit will boot the image without an unbrick recovery plan.
+
+### 3.4 Package Structure: The 8 Generated Artifacts
+The GitHub Actions workflow packages exactly 8 distinct files:
+1. `twrp_junsun_${RUN_NUMBER}.img`: Final signed 32 MiB recovery image.
+2. `boot_v2_validation_report.txt`: Output of `tools/validate_boot_v2.py` verifying Header v2, DTBO, and DTB structures.
+3. `sha256_raw_payload.txt`: SHA-256 checksum of the validated raw payload before AVB footer injection.
+4. `avb_key_pub_pem_sha256.txt`: SHA-256 checksum of the extracted PEM-encoded public key.
+5. `avb_key_bin_sha256.txt`: SHA-256 checksum of the extracted binary AVB format public key.
+6. `avb_verification_report.txt`: Output of `avbtool info_image` detailing footer version and descriptor offsets.
+7. `avb_crypto_verification.txt`: Output of `avbtool verify_image --key avb_key_pub.pem` verifying signature and hash.
+8. `sha256_recovery.txt`: SHA-256 checksum of the final signed 32 MiB recovery image.
+
 ---
 
 ## 4. Binary Discrepancy Analysis: Stock Boot vs. Magisk Patched Boot
