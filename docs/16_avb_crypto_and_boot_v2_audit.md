@@ -360,4 +360,4 @@ Before any flashing is approved for end users, the recovery image must pass the 
 | :--- | :--- | :--- | :--- | :--- |
 | [`40661162555`](https://github.com/toczke/JunsunV1Plus/actions/runs/40661162555) | `c777980` | Flasher APK Build | `app-debug.apk` (`f05f7200...`) | **SUCCESS** |
 | [`40668649073`](https://github.com/toczke/JunsunV1Plus/actions/runs/40668649073) | [`124b8e9`](https://github.com/toczke/JunsunV1Plus/commit/124b8e9c7c74e2634058718223eafed68e58f35d) | Hardened TWRP Build (Bounds Check & Lunch Error Handling) | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **BUILDING** |
-| `pending` | `HEAD` | Standard 32-Byte DT Entry & Multi-Entry Table Validator | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **QUEUED** |
+| [`40671670072`](https://github.com/toczke/JunsunV1Plus/actions/runs/40671670072) | [`7f65b97`](https://github.com/toczke/JunsunV1Plus/commit/7f65b973e08e37bff18bc9229f1f8c08dc11c4a2) | Standard 32-Byte DT Entry & Multi-Entry Table Validator | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **BUILDING** |
