@@ -311,4 +311,43 @@ Before performing any write operations to the physical eMMC storage of the TS866
 | [`40668649073`](https://github.com/toczke/JunsunV1Plus/actions/runs/40668649073) | [`124b8e9`](https://github.com/toczke/JunsunV1Plus/commit/124b8e9c7c74e2634058718223eafed68e58f35d) | Hardened TWRP Build | Blocked: `ValueError: Expected v2, got version 0` | **BLOCKED BY VALIDATOR** |
 | [`40674827850`](https://github.com/toczke/JunsunV1Plus/actions/runs/40674827850) | [`09f6cf1`](https://github.com/toczke/JunsunV1Plus/commit/09f6cf1c9e03bd8c63605b8d310d6cfc765ac0d5) | BoardConfig.mk v2 + Unified Validator | Boot v2 Verified (`3ca009e4...`), failed on Python 2 syntax in avbtool (`2L**32`) | **SYNTAX ERROR IN AVBTOOL** |
 | [`40678361305`](https://github.com/toczke/JunsunV1Plus/actions/runs/40678361305) | [`0107e80`](https://github.com/toczke/JunsunV1Plus/commit/0107e8080af19965b4c04ee8dab05c56bce9e6ea) | Patch `2L**` in `avbtool` for Python 3 compatibility | Raw payload verified (`f0d2bbca...`), footer added, failed on line 2251 (`print 'Verifying...'`) | **PYTHON 2 PRINT SYNTAX ERROR** |
-| Pending | Local | Canonical Python 3 `avbtool` 1.2.0 in `tools/` with `py_compile` checks | Final signed image and complete 8-file artifact package | **QUEUED** |
+| [`40682906936`](https://github.com/toczke/JunsunV1Plus/actions/runs/40682906936) | [`6324712`](https://github.com/toczke/JunsunV1Plus/commit/63247128bbc2c68164238ed434e991ad18fb5b18) | Canonical Python 3 `avbtool` 1.2.0 in `tools/` with `py_compile` checks | Complete 8-file artifact package (`twrp_junsun_37_package.zip`) | **SUCCESS (VERIFIED)** |
+
+---
+
+## 8. Independent Local Verification of Run 40682906936 Artifact Package
+
+The full 8-file artifact package was downloaded from run [40682906936](https://github.com/toczke/JunsunV1Plus/actions/runs/40682906936/artifacts/12814529420) and independently analyzed:
+
+1. **Artifact Package Completeness (8/8 Files Present):**
+   - `twrp_junsun_37.img` (33,554,432 bytes)
+   - `boot_v2_validation_report.txt`
+   - `sha256_raw_payload.txt`
+   - `avb_key_pub_pem_sha256.txt`
+   - `avb_key_bin_sha256.txt`
+   - `avb_verification_report.txt`
+   - `avb_crypto_verification.txt`
+   - `sha256_recovery.txt`
+
+2. **Bit-Level Byte-Slice & Digest Integrity:**
+   - **Signed Image Exact Size:** `33,554,432` bytes (32 MiB).
+   - **Signed Image SHA-256:** `59aba80e0b4401a9f9c2d87a9115d677131f66046cb5de1f5645343477fe6cf2` (matches `sha256_recovery.txt`).
+   - **Raw Payload Slice (`[0 : 25806848]`) SHA-256:** `217b6471d1fee8d8d337c7af0c619e6bbda3e494f38633b0e15b465320a46310` (matches `sha256_raw_payload.txt`).
+   - **AVB Public Key (PEM format) SHA-256:** `21e558364de72a4ab8c0660ae7b738844c513c873c454bff2094f276bf0a74bd`.
+   - **AVB Bootloader Binary Public Key SHA-256:** `22de3994532196f61c039e90260d78a93a4c57362c7e789be928036e80b77c8c`.
+
+3. **Independent Boot v2 Specification Conformance:**
+   Running `python3 tools/validate_boot_v2.py twrp_junsun_37.img --max-partition-size 33554432` confirms:
+   - Header Version: 2, Page size: 2048, Header size: 1660
+   - Kernel: 11,330,259 bytes
+   - Ramdisk: 14,315,700 bytes
+   - DTBO table: offset 25,651,200, size 48,358 bytes, 1 entry, magic `0xd7b7ab1e`
+   - DTB table: offset 25,700,352, size 105,691 bytes, 1 entry, magic `0xd7b7ab1e`
+   - Result: **PASS**
+
+4. **Independent AVB Cryptographic Signature Verification:**
+   Running `tools/avbtool verify_image --image recovery.img` confirms:
+   - `vbmeta: Successfully verified footer and SHA256_RSA2048 vbmeta struct in recovery.img`
+   - `recovery: Successfully verified sha256 hash of recovery.img for image of 25806848 bytes`
+   - Exit code: **0**
+
