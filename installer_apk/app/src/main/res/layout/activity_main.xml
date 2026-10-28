@@ -74,15 +74,15 @@
             android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_boot_twrp_direct"
+            android:id="@+id/btn_fix_boot"
             android:layout_width="0dp"
             android:layout_height="62dp"
             android:layout_weight="1"
-            android:text="🚀 3. ODPAL TWRP WPROST (BOOT)"
+            android:text="🛡️ 3. NAPRAW START (CLEAR MISC &amp; BOOT)"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#E65100" />
+            android:backgroundTint="#D84315" />
     </LinearLayout>
 
     <!-- Action Buttons Grid: Row 2 -->

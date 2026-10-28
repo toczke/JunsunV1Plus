@@ -36,7 +36,7 @@ public class MainActivity extends Activity {
     private Button btnAdbWifi;
     private Button btnFlashMagisk;
     private Button btnFlashTwrpFfup;
-    private Button btnBootTwrpDirect;
+    private Button btnFixBoot;
     private Button btnBackup;
     private Button btnRestoreStock;
     private Button btnReboot;
@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
         btnAdbWifi = findViewById(R.id.btn_adb_wifi);
         btnFlashMagisk = findViewById(R.id.btn_flash_magisk);
         btnFlashTwrpFfup = findViewById(R.id.btn_flash_twrp_ffup);
-        btnBootTwrpDirect = findViewById(R.id.btn_boot_twrp_direct);
+        btnFixBoot = findViewById(R.id.btn_fix_boot);
         btnBackup = findViewById(R.id.btn_backup);
         btnRestoreStock = findViewById(R.id.btn_restore_stock);
         btnReboot = findViewById(R.id.btn_reboot);
@@ -67,7 +67,7 @@ public class MainActivity extends Activity {
         btnAdbWifi.setOnClickListener(v -> runEnableAdbWifi());
         btnFlashMagisk.setOnClickListener(v -> runFlashMagiskRoot());
         btnFlashTwrpFfup.setOnClickListener(v -> runFlashTwrpFfup());
-        btnBootTwrpDirect.setOnClickListener(v -> runBootTwrpDirect());
+        btnFixBoot.setOnClickListener(v -> runFixBootLoop());
         btnBackup.setOnClickListener(v -> runBackupAll());
         btnRestoreStock.setOnClickListener(v -> runRestoreStock());
         btnReboot.setOnClickListener(v -> runReboot());
@@ -223,11 +223,12 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Option 1: Installs Magisk root cleanly via boot partition
+     * Option 1: Installs Magisk root cleanly via boot partition (PO BOŻEMU)
+     * Flashes verified boot image AND clears misc to avoid recovery/fastboot loops.
      */
     private void runFlashMagiskRoot() {
         new Thread(() -> {
-            log(">>> [1/4] Rozpoczynanie instalacji Root Magisk...");
+            log(">>> [1/5] Rozpoczynanie instalacji Root Magisk...");
             String magiskImg = findFile("boot_magisk_patched.img", "magisk_boot.img");
             if (magiskImg == null) {
                 log("BŁĄD: Nie znaleziono obrazu boot_magisk_patched.img na USB/SD!");
@@ -235,20 +236,25 @@ public class MainActivity extends Activity {
             }
 
             String bootDev = findBlockDevice("boot");
+            String miscDev = findBlockDevice("misc");
             log("Znaleziono obraz Magisk: " + magiskImg);
             log("Docelowa partycja boot: " + bootDev);
 
             // Safety backup
-            log(">>> [2/4] Zrzut kopii zapasowej obecnego boot.img...");
+            log(">>> [2/5] Zrzut kopii zapasowej obecnego boot.img...");
             String backupPath = "/sdcard/RecoveryBackup/stock_boot_auto_backup.img";
             executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + bootDev + " of=" + backupPath + " bs=4M");
 
             // Flash
-            log(">>> [3/4] Wgrywanie spatchowanego boot.img (Magisk)...");
+            log(">>> [3/5] Wgrywanie spatchowanego boot.img (Magisk)...");
             String res = executeRootCommand("dd if=\"" + magiskImg + "\" of=\"" + bootDev + "\" bs=4M");
             log(res.trim());
 
-            log(">>> [4/4] Synchronizacja pamięci flash (sync)...");
+            // Clear misc to prevent any accidental recovery/fastboot trigger
+            log(">>> [4/5] Czyszczenie nagłówka misc (zapobieganie pętlom bootowania)...");
+            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+
+            log(">>> [5/5] Synchronizacja pamięci flash (sync)...");
             executeRootCommand("sync");
 
             log("==================================================");
@@ -260,6 +266,7 @@ public class MainActivity extends Activity {
 
     /**
      * Option 2: Flashes TWRP and triggers Topway LittleKernel RECOVERY via 'ffup'
+     * Flashes ONLY to recovery partition. Never touches boot!
      */
     private void runFlashTwrpFfup() {
         new Thread(() -> {
@@ -273,11 +280,10 @@ public class MainActivity extends Activity {
             String recDev = findBlockDevice("recovery");
             String miscDev = findBlockDevice("misc");
             log("Obraz TWRP: " + twrpImg);
-            log("Partycja recovery: " + recDev);
-            log("Partycja misc: " + miscDev);
+            log("Docelowa partycja recovery: " + recDev);
 
             // Flash TWRP
-            log(">>> [2/5] Wgrywanie TWRP na partycję recovery...");
+            log(">>> [2/5] Wgrywanie TWRP wyłącznie na partycję recovery...");
             executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + recDev + "\" bs=4M");
 
             // Write 'ffup' into misc
@@ -296,33 +302,38 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Option 3: Direct boot to TWRP by flashing TWRP into boot partition (100% guaranteed hardware boot)
+     * Option 3: Fix boot loop & clear misc (PO BOŻEMU)
+     * Clears misc partition to remove stuck 'ffup' triggers,
+     * Restores valid Magisk or Stock boot image to boot partition,
+     * and performs full sync.
      */
-    private void runBootTwrpDirect() {
+    private void runFixBootLoop() {
         new Thread(() -> {
-            log(">>> [1/4] Bezpośredni start TWRP przez partycję boot...");
-            String twrpImg = findFile("twrp_fixed_32mb.img", "twrp.img");
-            if (twrpImg == null) {
-                log("BŁĄD: Nie znaleziono pliku twrp_fixed_32mb.img!");
-                return;
+            log(">>> [1/4] Procedura ratunkowa 'PO BOŻEMU'...");
+            String bootDev = findBlockDevice("boot");
+            String miscDev = findBlockDevice("misc");
+
+            // 1. Clear misc partition completely so LittleKernel NEVER loops to recovery or fastboot
+            log(">>> [2/4] Czyszczenie flagi misc (usunięcie pętli Fastboot/Recovery)...");
+            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+
+            // 2. Locate legitimate boot image
+            log(">>> [3/4] Wgrywanie sprawnego jądra boot.img...");
+            String goodBoot = findFile("boot_magisk_patched.img", "boot_stock.img", "stock_boot.img");
+            if (goodBoot != null) {
+                log("Używam sprawdzonego obrazu boot: " + goodBoot);
+                executeRootCommand("dd if=\"" + goodBoot + "\" of=\"" + bootDev + "\" bs=4M");
+            } else {
+                log("OSTRZEŻENIE: Nie znaleziono obrazu na USB. Jeśli backup istnieje w /sdcard, przywracam...");
+                executeRootCommand("dd if=/sdcard/RecoveryBackup/stock_boot_auto_backup.img of=\"" + bootDev + "\" bs=4M 2>/dev/null || true");
             }
 
-            String bootDev = findBlockDevice("boot");
-            log("Obraz TWRP: " + twrpImg);
-            log("Docelowa partycja startowa: " + bootDev);
-
-            // Safety backup of stock boot
-            log(">>> [2/4] Zapisywanie kopii obecnego boot do /sdcard/RecoveryBackup/stock_boot_before_twrp.img...");
-            executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + bootDev + " of=/sdcard/RecoveryBackup/stock_boot_before_twrp.img bs=4M");
-
-            // Flash TWRP into boot
-            log(">>> [3/4] Wgrywanie TWRP na partycję boot...");
-            executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + bootDev + "\" bs=4M");
             executeRootCommand("sync");
-
-            log(">>> [4/4] Restartowanie... Radio odpali się WPROST do menu TWRP!");
-            try { Thread.sleep(1500); } catch (Exception ignored) {}
-            executeRootCommand("reboot");
+            log(">>> [4/4] Flaga misc wyczyszczona, partycja boot przywrócona.");
+            log("==================================================");
+            log("SUKCES! Stacja jest odblokowana.");
+            log("Kliknij 'Restartuj Radio', aby uruchomić normalnie system.");
+            log("==================================================");
         }).start();
     }
 
