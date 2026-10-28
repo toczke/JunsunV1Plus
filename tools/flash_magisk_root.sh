@@ -17,14 +17,7 @@ echo "[2/4] Przesyłanie spatchowanego obrazu boot.img..."
 adb push output_images/boot_magisk_patched.img /data/local/tmp/boot_magisk_patched.img
 
 echo "[3/4] Wgrywanie na partycję /dev/block/by-name/boot..."
-adb shell << EOF
-/system/xbin/ffsu $BACKDOOR
-dd if=/data/local/tmp/boot_magisk_patched.img of=/dev/block/by-name/boot bs=4M
-sync
-rm -f /data/local/tmp/boot_magisk_patched.img
-exit
-exit
-EOF
+adb shell "/system/xbin/ffsu '$BACKDOOR' -c 'sh -c \"dd if=/data/local/tmp/boot_magisk_patched.img of=/dev/block/by-name/boot bs=4M && sync && rm -f /data/local/tmp/boot_magisk_patched.img\"'"
 
 echo "[4/4] Restartowanie stacji..."
 adb reboot

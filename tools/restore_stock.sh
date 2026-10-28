@@ -6,26 +6,21 @@ PORT="5555"
 BACKDOOR="@#zxcvbnmasdfghjklqwertyuiop1234567890,."
 
 echo "=================================================="
-echo "Przywracanie fabrycznego boot.img i czyszczenie misc"
+echo "Przywracanie fabrycznego boot.img, recovery.img i czyszczenie misc"
 echo "Cel: $IP:$PORT"
 echo "=================================================="
 
 echo "[1/4] Łączenie przez ADB..."
 adb connect "$IP:$PORT" || true
 
-echo "[2/4] Przesyłanie fabrycznego boot_stock.img..."
+echo "[2/4] Przesyłanie fabrycznych obrazów..."
 adb push output_images/boot_stock.img /data/local/tmp/boot_stock.img
+if [ -f output_images/recovery_stock.img ]; then
+    adb push output_images/recovery_stock.img /data/local/tmp/recovery_stock.img
+fi
 
-echo "[3/4] Przywracanie boot i zerowanie misc..."
-adb shell << EOF
-/system/xbin/ffsu $BACKDOOR
-dd if=/data/local/tmp/boot_stock.img of=/dev/block/by-name/boot bs=4M
-dd if=/dev/zero of=/dev/block/by-name/misc bs=4 count=1 conv=notrunc
-sync
-rm -f /data/local/tmp/boot_stock.img
-exit
-exit
-EOF
+echo "[3/4] Przywracanie boot, recovery i zerowanie misc..."
+adb shell "/system/xbin/ffsu '$BACKDOOR' -c 'sh -c \"dd if=/data/local/tmp/boot_stock.img of=/dev/block/by-name/boot bs=4M; [ -f /data/local/tmp/recovery_stock.img ] && dd if=/data/local/tmp/recovery_stock.img of=/dev/block/by-name/recovery bs=4M; dd if=/dev/zero of=/dev/block/by-name/misc bs=4 count=1 conv=notrunc; sync; rm -f /data/local/tmp/boot_stock.img /data/local/tmp/recovery_stock.img\"'"
 
 echo "[4/4] Restartowanie stacji..."
 adb reboot

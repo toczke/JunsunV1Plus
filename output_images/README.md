@@ -21,3 +21,9 @@ Katalog zawiera przetestowane, zweryfikowane obrazy w formacie Android Boot v2 o
 - **SHA-256:** `9c7f01d94ae090ccd03ccad36caaf95f6b14de79e58529669e0b80ee74c35ac4`
 - **Opis:** Oryginalny, fabryczny zrzut partycji boot bez żadnych modyfikacji.
 - **Przeznaczenie:** Przywrócenie stanu fabrycznego.
+
+### 4. `recovery_stock.img`
+- **Rozmiar:** 33,554,432 bajtów (32 MB)
+- **SHA-256:** `7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f`
+- **Opis:** Oryginalny, fabryczny zrzut partycji recovery (wyekstrahowany z `8667.bin`).
+- **Przeznaczenie:** Przywrócenie fabrycznego recovery Topway w razie potrzeby.

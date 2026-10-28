@@ -17,15 +17,7 @@ echo "[2/4] Przesyłanie obrazu TWRP..."
 adb push output_images/twrp_fixed_32mb.img /data/local/tmp/twrp.img
 
 echo "[3/4] Wgrywanie na recovery i ustawianie triggera ffup w misc..."
-adb shell << EOF
-/system/xbin/ffsu $BACKDOOR
-dd if=/data/local/tmp/twrp.img of=/dev/block/by-name/recovery bs=4M
-printf "ffup" | dd of=/dev/block/by-name/misc bs=4 count=1 conv=notrunc
-sync
-rm -f /data/local/tmp/twrp.img
-exit
-exit
-EOF
+adb shell "/system/xbin/ffsu '$BACKDOOR' -c 'sh -c \"dd if=/data/local/tmp/twrp.img of=/dev/block/by-name/recovery bs=4M && printf ffup | dd of=/dev/block/by-name/misc bs=4 count=1 conv=notrunc && sync && rm -f /data/local/tmp/twrp.img\"'"
 
 echo "[4/4] Restartowanie stacji (zwykły reboot - LK odczyta ffup)..."
 adb reboot
