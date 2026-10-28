@@ -208,7 +208,7 @@ public class MainActivity extends Activity {
 
     private String findFile(String... names) {
         for (String name : names) {
-            String cmd = "find /storage /mnt /sdcard -name \"" + name + "\" 2>/dev/null | head -n 1";
+            String cmd = "find /storage /mnt /sdcard -maxdepth 4 -name \"" + name + "\" 2>/dev/null | head -n 1";
             String out = executeRootCommand(cmd).trim();
             if (!out.isEmpty() && out.startsWith("/") && !out.contains("Exception")) {
                 return out;
@@ -272,6 +272,15 @@ public class MainActivity extends Activity {
             } else {
                 process = Runtime.getRuntime().exec("su");
             }
+
+            // Drain stderr in background to completely prevent process pipe deadlock
+            new Thread(() -> {
+                try {
+                    InputStream err = process.getErrorStream();
+                    byte[] discard = new byte[1024];
+                    while (err.read(discard) != -1) {}
+                } catch (Exception ignored) {}
+            }).start();
 
             DataOutputStream os = new DataOutputStream(process.getOutputStream());
             long blocks = (byteCount + 65535) / 65536;
@@ -483,14 +492,19 @@ public class MainActivity extends Activity {
      */
     private void runRebootRecovery() {
         new Thread(() -> {
-            log(">>> Setting LittleKernel 'ffup' recovery trigger in misc...");
-            String miscDev = findBlockDevice("misc");
-            executeRootCommand("printf \"ffup\" | dd of=\"" + miscDev + "\" bs=4 count=1 conv=notrunc");
-            executeRootCommand("sync");
+            setButtonsEnabled(false);
+            try {
+                log(">>> Setting LittleKernel 'ffup' recovery trigger in misc...");
+                String miscDev = findBlockDevice("misc");
+                executeRootCommand("printf \"ffup\" | dd of=\"" + miscDev + "\" bs=4 count=1 conv=notrunc");
+                executeRootCommand("sync");
 
-            log(">>> Rebooting headunit cleanly (LittleKernel will detect ffup)...");
-            try { Thread.sleep(1000); } catch (Exception ignored) {}
-            executeRootCommand("reboot");
+                log(">>> Rebooting headunit cleanly (LittleKernel will detect ffup)...");
+                try { Thread.sleep(1000); } catch (Exception ignored) {}
+                executeRootCommand("reboot");
+            } finally {
+                setButtonsEnabled(true);
+            }
         }).start();
     }
 
@@ -499,25 +513,30 @@ public class MainActivity extends Activity {
      */
     private void runBackupAll() {
         new Thread(() -> {
-            log(">>> Initiating full partition backup (boot and recovery)...");
-            String bootDev = findBlockDevice("boot");
-            String recDev = findBlockDevice("recovery");
+            setButtonsEnabled(false);
+            try {
+                log(">>> Initiating full partition backup (boot and recovery)...");
+                String bootDev = findBlockDevice("boot");
+                String recDev = findBlockDevice("recovery");
 
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            String outDir = "/sdcard/RecoveryBackup";
-            executeRootCommand("mkdir -p " + outDir);
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                String outDir = "/sdcard/RecoveryBackup";
+                executeRootCommand("mkdir -p " + outDir);
 
-            String bootOut = outDir + "/boot_" + timeStamp + ".img";
-            String recOut = outDir + "/recovery_" + timeStamp + ".img";
+                String bootOut = outDir + "/boot_" + timeStamp + ".img";
+                String recOut = outDir + "/recovery_" + timeStamp + ".img";
 
-            log("Saving boot backup to: " + bootOut);
-            executeRootCommand("dd if=" + bootDev + " of=" + bootOut + " bs=4M");
+                log("Saving boot backup to: " + bootOut);
+                executeRootCommand("dd if=" + bootDev + " of=" + bootOut + " bs=4M conv=fsync");
 
-            log("Saving recovery backup to: " + recOut);
-            executeRootCommand("dd if=" + recDev + " of=" + recOut + " bs=4M");
+                log("Saving recovery backup to: " + recOut);
+                executeRootCommand("dd if=" + recDev + " of=" + recOut + " bs=4M conv=fsync");
 
-            executeRootCommand("sync");
-            log("[SUCCESS] Partitions backed up successfully to " + outDir);
+                executeRootCommand("sync");
+                log("[SUCCESS] Partitions backed up successfully to " + outDir);
+            } finally {
+                setButtonsEnabled(true);
+            }
         }).start();
     }
 
@@ -526,36 +545,41 @@ public class MainActivity extends Activity {
      */
     private void runRestoreStock() {
         new Thread(() -> {
-            log(">>> Initiating stock firmware restoration...");
-            String stockBoot = findFile("boot_stock.img", "stock_boot.img");
-            String stockRec = findFile("recovery.img", "stock_recovery.img");
+            setButtonsEnabled(false);
+            try {
+                log(">>> Initiating stock firmware restoration...");
+                String stockBoot = findFile("boot_stock.img", "stock_boot.img");
+                String stockRec = findFile("recovery.img", "stock_recovery.img");
 
-            String bootDev = findBlockDevice("boot");
-            String recDev = findBlockDevice("recovery");
-            String miscDev = findBlockDevice("misc");
+                String bootDev = findBlockDevice("boot");
+                String recDev = findBlockDevice("recovery");
+                String miscDev = findBlockDevice("misc");
 
-            if (stockBoot != null) {
-                log("Restoring stock boot.img from: " + stockBoot);
-                executeRootCommand("dd if=\"" + stockBoot + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
-            } else {
-                log("[WARNING] Stock boot image not found on external storage.");
+                if (stockBoot != null) {
+                    log("Restoring stock boot.img from: " + stockBoot);
+                    executeRootCommand("dd if=\"" + stockBoot + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+                } else {
+                    log("[WARNING] Stock boot image not found on external storage.");
+                }
+
+                if (stockRec != null) {
+                    log("Restoring stock recovery.img from: " + stockRec);
+                    executeRootCommand("dd if=\"" + stockRec + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+                } else {
+                    log("[WARNING] Stock recovery image not found on external storage.");
+                }
+
+                log("Clearing misc trigger...");
+                executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+                executeRootCommand("sync");
+
+                log("==================================================");
+                log("[SUCCESS] Factory stock state restored.");
+                log("Click 'Reboot System' to restart.");
+                log("==================================================");
+            } finally {
+                setButtonsEnabled(true);
             }
-
-            if (stockRec != null) {
-                log("Restoring stock recovery.img from: " + stockRec);
-                executeRootCommand("dd if=\"" + stockRec + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
-            } else {
-                log("[WARNING] Stock recovery image not found on external storage.");
-            }
-
-            log("Clearing misc trigger...");
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
-            executeRootCommand("sync");
-
-            log("==================================================");
-            log("[SUCCESS] Factory stock state restored.");
-            log("Click 'Reboot System' to restart.");
-            log("==================================================");
         }).start();
     }
 
@@ -564,27 +588,34 @@ public class MainActivity extends Activity {
      */
     private void runRebootSystem() {
         new Thread(() -> {
-            log("Clearing misc trigger to ensure clean boot...");
-            String miscDev = findBlockDevice("misc");
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
-            executeRootCommand("sync");
+            setButtonsEnabled(false);
+            try {
+                log("Clearing misc trigger to ensure clean boot...");
+                String miscDev = findBlockDevice("misc");
+                executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+                executeRootCommand("sync");
 
-            log("Rebooting system...");
-            try { Thread.sleep(500); } catch (Exception ignored) {}
-            executeRootCommand("reboot");
+                log("Rebooting system...");
+                try { Thread.sleep(500); } catch (Exception ignored) {}
+                executeRootCommand("reboot");
+            } finally {
+                setButtonsEnabled(true);
+            }
         }).start();
     }
 
     private String executeRootCommand(String command) {
         StringBuilder output = new StringBuilder();
         try {
-            Process process;
+            ProcessBuilder pb;
             File ffsu = new File(FFSU_BIN);
             if (ffsu.exists()) {
-                process = Runtime.getRuntime().exec(new String[]{FFSU_BIN, FFSU_BACKDOOR_KEY});
+                pb = new ProcessBuilder(FFSU_BIN, FFSU_BACKDOOR_KEY);
             } else {
-                process = Runtime.getRuntime().exec("su");
+                pb = new ProcessBuilder("su");
             }
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
 
             DataOutputStream os = new DataOutputStream(process.getOutputStream());
             os.writeBytes(command + "\n");
@@ -592,12 +623,8 @@ public class MainActivity extends Activity {
             os.flush();
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-            while ((line = errorReader.readLine()) != null) {
                 output.append(line).append("\n");
             }
             process.waitFor();
