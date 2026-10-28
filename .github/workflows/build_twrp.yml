@@ -72,67 +72,103 @@ jobs:
       - name: Prepare Artifacts & Add AVB Hash Footer
         run: |
           set -e
-          OUT_DIR=~/twrp/out/target/product/ts8667
+          OUT_DIR="$HOME/twrp/out/target/product/ts8667"
           TARGET_FILE="twrp_junsun_${{ github.run_number }}.img"
           if [ ! -f "$OUT_DIR/recovery.img" ]; then
-            echo "Recovery image not found in out directory"
+            echo "Recovery image not found in out directory: $OUT_DIR/recovery.img"
             exit 1
           fi
 
           cp "$OUT_DIR/recovery.img" ./twrp_raw.img
 
-          # Locate avbtool from TWRP source tree or system PATH
-          if [ -f ~/twrp/external/avb/avbtool ]; then
-            AVBTOOL="python3 ~/twrp/external/avb/avbtool"
-          elif command -v avbtool >/dev/null; then
-            AVBTOOL="avbtool"
+          # Locate avbtool using robust bash array pattern avoiding tilde expansion issues
+          AVBTOOL_SCRIPT="$HOME/twrp/external/avb/avbtool"
+          if [ -f "$AVBTOOL_SCRIPT" ]; then
+            avbtool_cmd=(python3 "$AVBTOOL_SCRIPT")
+          elif command -v avbtool >/dev/null 2>&1; then
+            avbtool_cmd=(avbtool)
           else
-            echo "ERROR: avbtool not found in ~/twrp/external/avb/avbtool or PATH"
+            echo "ERROR: avbtool not found at $AVBTOOL_SCRIPT or in PATH"
             exit 1
           fi
-          echo "Using AVB tool: $AVBTOOL"
+          echo "Using AVB command: ${avbtool_cmd[*]}"
 
           # Determine RSA key for AVB signing
-          AVB_KEY=~/twrp/external/avb/test/data/testkey_rsa2048.pem
+          AVB_KEY="$HOME/twrp/external/avb/test/data/testkey_rsa2048.pem"
           if [ ! -f "$AVB_KEY" ]; then
             echo "Generating fallback RSA2048 signing key..."
             openssl genrsa -out ./avb_key.pem 2048
-            AVB_KEY=./avb_key.pem
+            AVB_KEY="./avb_key.pem"
           fi
 
-          # Truncate image to exact unpadded Android boot image v2 boundary before footer injection
+          # Rigorous Android Boot Image Header v2 parsing and payload validation
           python3 -c '
-          import struct, sys
+          import struct, sys, os
+
           target_path = "./twrp_raw.img"
           with open(target_path, "r+b") as f:
               header = f.read(2048)
               magic, k_sz, k_addr, r_sz, r_addr, s_sz, s_addr, tags_addr, page_sz, ver = struct.unpack("<8s9I", header[:44])
               if magic != b"ANDROID!":
                   raise ValueError(f"Invalid magic header: {magic}")
+              if ver != 2:
+                  raise ValueError(f"Expected Android Boot Image v2, got version {ver}")
+              if page_sz not in (2048, 4096):
+                  raise ValueError(f"Unexpected page size: {page_sz}")
+              if k_sz == 0 or r_sz == 0:
+                  raise ValueError(f"Empty kernel or ramdisk payload: k_sz={k_sz}, r_sz={r_sz}")
+
               def pad(sz): return ((sz + page_sz - 1) // page_sz) * page_sz
-              total_sz = page_sz + pad(k_sz) + pad(r_sz) + pad(s_sz)
-              if ver >= 1:
-                  dtbo_sz = struct.unpack("<I", header[1632:1636])[0]
-                  total_sz += pad(dtbo_sz)
-              if ver >= 2:
-                  dtb_sz = struct.unpack("<I", header[1648:1652])[0]
-                  total_sz += pad(dtb_sz)
+
+              dtbo_sz, dtbo_off = struct.unpack("<IQ", header[1632:1644])
+              hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", header[1644:1660])
+
+              off_k = page_sz
+              off_r = off_k + pad(k_sz)
+              off_s = off_r + pad(r_sz)
+              off_dtbo = off_s + pad(s_sz)
+              off_dtb = off_dtbo + pad(dtbo_sz)
+              total_sz = off_dtb + pad(dtb_sz)
+
               current_sz = f.seek(0, 2)
-              print(f"Header version {ver}, calculated raw payload size: {total_sz} bytes (current size: {current_sz} bytes)")
+              print(f"Boot v2 Header validated: ver={ver}, page_sz={page_sz}")
+              print(f"  Kernel: size={k_sz} (padded={pad(k_sz)})")
+              print(f"  Ramdisk: size={r_sz} (padded={pad(r_sz)})")
+              print(f"  Recovery DTBO: size={dtbo_sz} (padded={pad(dtbo_sz)})")
+              print(f"  DTB: size={dtb_sz} (padded={pad(dtb_sz)})")
+              print(f"Calculated payload boundary: {total_sz} bytes (current file size: {current_sz} bytes)")
+
+              if total_sz > 33484800:
+                  raise ValueError(f"Payload {total_sz} exceeds max allowed size 33484800 for 32MB partition")
+
+              # Validate DTBO section header if present
+              if dtbo_sz > 0:
+                  f.seek(off_dtbo)
+                  dtbo_magic = f.read(4)
+                  print(f"DTBO table magic at offset {off_dtbo}: {dtbo_magic.hex()}")
+                  assert dtbo_magic == bytes.fromhex("d7b7ab1e"), f"Invalid DTBO table magic: {dtbo_magic.hex()}"
+
+              # Validate DTB section header if present
+              if dtb_sz > 0:
+                  f.seek(off_dtb)
+                  dtb_magic = f.read(4)
+                  print(f"DTB magic at offset {off_dtb}: {dtb_magic.hex()}")
+                  assert dtb_magic in (bytes.fromhex("d7b7ab1e"), bytes.fromhex("d00dfeed")), f"Invalid DTB magic: {dtb_magic.hex()}"
+
               if current_sz > total_sz:
-                  print(f"Truncating {target_path} to {total_sz} bytes prior to avbtool footer injection")
+                  print(f"Truncating {target_path} from {current_sz} to exact payload {total_sz} bytes")
                   f.truncate(total_sz)
           '
 
-          # Inject AVB hash footer without suppressing errors
-          $AVBTOOL add_hash_footer \
+          # Inject AVB hash footer
+          "${avbtool_cmd[@]}" add_hash_footer \
             --image ./twrp_raw.img \
             --partition_size 33554432 \
             --partition_name recovery \
             --algorithm SHA256_RSA2048 \
             --key "$AVB_KEY"
 
-          # Rigorous verification of output image
+          # Verify partition size
           ACTUAL_SIZE=$(stat -c%s ./twrp_raw.img)
           echo "Generated image size: $ACTUAL_SIZE bytes"
           if [ "$ACTUAL_SIZE" -ne 33554432 ]; then
@@ -140,14 +176,30 @@ jobs:
             exit 1
           fi
 
-          # Verify AVB structure and extract report
-          $AVBTOOL info_image --image ./twrp_raw.img > avb_verification_report.txt
-          echo "=== AVB Verification Report ==="
+          # Structural metadata inspection
+          "${avbtool_cmd[@]}" info_image --image ./twrp_raw.img > avb_verification_report.txt
+          echo "=== AVB Structural Metadata Report ==="
           cat avb_verification_report.txt
 
           grep -q "Footer version:.*1.0" avb_verification_report.txt || { echo "ERROR: Missing AVB Footer version 1.0"; exit 1; }
           grep -q "Partition Name:.*recovery" avb_verification_report.txt || { echo "ERROR: Partition name is not recovery"; exit 1; }
           grep -q "Algorithm:.*SHA256_RSA2048" avb_verification_report.txt || { echo "ERROR: Algorithm is not SHA256_RSA2048"; exit 1; }
+
+          # Cryptographic signature and hash descriptor verification
+          mkdir -p /tmp/verify_twrp
+          cp ./twrp_raw.img /tmp/verify_twrp/recovery.img
+          "${avbtool_cmd[@]}" verify_image --image /tmp/verify_twrp/recovery.img > avb_crypto_verification.txt
+          echo "=== AVB Cryptographic Verification Report ==="
+          cat avb_crypto_verification.txt
+
+          grep -q "Successfully verified footer and SHA256_RSA2048 vbmeta struct" avb_crypto_verification.txt || {
+            echo "ERROR: Cryptographic signature verification failed"
+            exit 1
+          }
+          grep -q "Successfully verified sha256 hash" avb_crypto_verification.txt || {
+            echo "ERROR: Cryptographic hash descriptor verification failed"
+            exit 1
+          }
 
           # Calculate SHA-256
           sha256sum ./twrp_raw.img > sha256_recovery.txt
@@ -164,5 +216,6 @@ jobs:
           path: |
             ./${{ env.TARGET_FILE }}
             avb_verification_report.txt
+            avb_crypto_verification.txt
             sha256_recovery.txt
           if-no-files-found: error
