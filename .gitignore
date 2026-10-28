@@ -1,4 +1,5 @@
 out/
+android13_aosp/out/
 vendor/
 *.log
 *.tmp
