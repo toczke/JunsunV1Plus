@@ -76,6 +76,12 @@ public class CarSettingsService extends Service {
     }
 
     private final ICarSettingsService.Stub mBinder = new ICarSettingsService.Stub() {
+        private void enforcePermission() {
+            enforceCallingOrSelfPermission(
+                    "android.permission.BIND_CAR_SETTINGS_SERVICE",
+                    "Requires android.permission.BIND_CAR_SETTINGS_SERVICE permission");
+        }
+
         @Override
         public int getApiVersion() {
             return API_VERSION;
@@ -88,6 +94,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public boolean setMasterVolume(int volume) {
+            enforcePermission();
             if (volume < 0 || volume > 30) {
                 Log.w(TAG, "Rejected invalid master volume: " + volume);
                 return false;
@@ -104,6 +111,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public boolean setMuted(boolean muted) {
+            enforcePermission();
             mMuted = muted;
             notifyVolumeChanged(mMasterVolume, mMuted);
             return true;
@@ -111,6 +119,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public boolean setAudioSource(int source) {
+            enforcePermission();
             if (source < 0 || source > 3) {
                 Log.w(TAG, "Rejected invalid audio source: " + source);
                 return false;
@@ -170,6 +179,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public boolean setFanSpeed(int pwmValue) {
+            enforcePermission();
             if (pwmValue < 0 || pwmValue > 255) {
                 Log.w(TAG, "Rejected invalid fan PWM: " + pwmValue);
                 return false;
@@ -190,6 +200,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public void registerCallback(ICarSettingsCallback callback) {
+            enforcePermission();
             if (callback != null) {
                 mCallbacks.register(callback);
             }
@@ -197,6 +208,7 @@ public class CarSettingsService extends Service {
 
         @Override
         public void unregisterCallback(ICarSettingsCallback callback) {
+            enforcePermission();
             if (callback != null) {
                 mCallbacks.unregister(callback);
             }

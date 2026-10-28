@@ -66,19 +66,28 @@ ui_print "[✓] Hardware platform verified: MediaTek TS8667 compatible."
 set_progress 0.10
 
 # ------------------------------------------------------------------------------
-# GATE 2: Locate and Map Dynamic Logical System Partition
+# GATE 2: Locate and Map Dynamic Logical System Partition & Active Slot
 # ------------------------------------------------------------------------------
-ui_print "- Locating target logical system block device..."
+ui_print "- Locating target logical system block device & slot status..."
 umount /system 2>/dev/null || true
 umount /system_root 2>/dev/null || true
 umount /tmp/sys_mnt 2>/dev/null || true
 
+SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null || true)
+if [ -n "$SLOT" ]; then
+    ui_print "  Active Slot: $SLOT (A/B layout detected)"
+else
+    ui_print "  Active Slot: None (Standard A-only Dynamic Partitions)"
+fi
+
 SYS_BLOCK=""
-for dev in \
-    /dev/block/mapper/system \
-    /dev/block/by-name/system \
-    /dev/block/platform/bootdevice/by-name/system \
-    /dev/block/platform/*/by-name/system; do
+CANDIDATES=""
+if [ -n "$SLOT" ]; then
+    CANDIDATES="/dev/block/mapper/system${SLOT} /dev/block/by-name/system${SLOT}"
+fi
+CANDIDATES="$CANDIDATES /dev/block/mapper/system /dev/block/by-name/system /dev/block/platform/bootdevice/by-name/system"
+
+for dev in $CANDIDATES; do
     if [ -b "$dev" ]; then
         SYS_BLOCK="$dev"
         break
@@ -96,14 +105,23 @@ fi
 if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
     ui_print "[-] ERROR: Cannot locate logical system block device!"
     ui_print "    Ensure Dynamic Partitions (super) are mapped in TWRP."
+    ui_print "    Refusing to write to ambiguous block devices."
     exit 1
 fi
 
-ui_print "[✓] Target system block device: $SYS_BLOCK"
+ui_print "[✓] Target system block device verified: $SYS_BLOCK"
 
 # ------------------------------------------------------------------------------
-# GATE 3: Pre-Flash Partition Capacity Check
+# GATE 3: Pre-Flash Image Integrity & Partition Capacity Check
 # ------------------------------------------------------------------------------
+ui_print "- Testing payload archive integrity (CRC32)..."
+if ! unzip -t "$ZIPFILE" system.img >/dev/null 2>&1; then
+    ui_print "[-] ERROR: system.img archive verification failed! Archive corrupted."
+    ui_print "    Aborting before modifying physical eMMC storage."
+    exit 1
+fi
+ui_print "[✓] Payload integrity verified (CRC32 valid)."
+
 PART_SIZE=$(blockdev --getsize64 "$SYS_BLOCK" 2>/dev/null || echo 0)
 ui_print "  Allocated partition size: $PART_SIZE bytes (Required: $MIN_REQUIRED_BYTES bytes)"
 

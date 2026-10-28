@@ -50,9 +50,13 @@ static int set_fan_speed(int pwm, int dry_run) {
 
 int main(int argc, char** argv) {
     int dry_run = 0;
+    int enable_fan_pwm = 0;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--dry-run") == 0) {
             dry_run = 1;
+        } else if (strcmp(argv[i], "--enable-fan") == 0) {
+            enable_fan_pwm = 1;
         }
     }
 
@@ -65,13 +69,14 @@ int main(int argc, char** argv) {
 
     int last_pwm = -1;
     int sensor_error_count = 0;
-    int fan_hw_present = 1;
+    int fan_hw_present = 0;
 
-    if (!dry_run && access(FAN_PATH, F_OK) != 0) {
-        printf("[fan_governor] Notice: %s does not exist on this unit.\n", FAN_PATH);
-        printf("[fan_governor] Topway TS8667 uses passive aluminum chassis heatsink cooling by default.\n");
-        printf("[fan_governor] Running in thermal monitoring mode (no PWM hardware control active).\n");
-        fan_hw_present = 0;
+    if (enable_fan_pwm && access(FAN_PATH, F_OK) == 0) {
+        fan_hw_present = 1;
+        printf("[fan_governor] Active PWM cooling fan control ENABLED on %s\n", FAN_PATH);
+    } else {
+        printf("[fan_governor] Operating strictly in PASSIVE thermal monitoring mode.\n");
+        printf("[fan_governor] (TS8667 uses chassis heatsink cooling; PWM write disabled by default).\n");
     }
 
     while (g_running) {

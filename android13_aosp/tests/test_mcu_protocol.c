@@ -208,6 +208,33 @@ int main(void) {
         }
     }
 
+    // Test 6: Multi-Byte CAN-Bus Telemetry Frame (Len: 5, Cmd: 0x20, Data: [0x12, 0x34, 0x56, 0x78])
+    {
+        tests_run++;
+        mcu_parser_t parser;
+        memset(&parser, 0, sizeof(parser));
+        unsigned char test_data[] = { 0x12, 0x34, 0x56, 0x78 };
+        unsigned char expected_chk = calculate_expected_chk(0x05, 0x20, test_data, 4);
+        // Sum = 5 + 0x20 (32) + 0x12 (18) + 0x34 (52) + 0x56 (86) + 0x78 (120) = 313 (0x139) -> 0x39.
+        // 0x39 ^ 0xFF = 0xC6.
+        assert(expected_chk == 0xC6);
+
+        unsigned char frame[] = { 0x2E, 0x05, 0x20, 0x12, 0x34, 0x56, 0x78, 0xC6 };
+        unsigned char cmd = 0;
+        unsigned char data[16] = {0};
+        int len = 0;
+        int res = 0;
+        for (size_t i = 0; i < sizeof(frame); i++) {
+            res = mcu_parser_feed(&parser, frame[i], &cmd, data, &len);
+        }
+        if (res == 1 && cmd == 0x20 && len == 4 && memcmp(data, test_data, 4) == 0) {
+            printf("[✓] Test 6 PASSED: Multi-byte CAN-bus telemetry frame decoded with valid checksum (0xC6)\n");
+            tests_passed++;
+        } else {
+            fprintf(stderr, "[✗] Test 6 FAILED: Multi-byte frame parsing error\n");
+        }
+    }
+
     printf("=================================================================\n");
     printf(" Summary: %d/%d MCU protocol unit tests PASSED (100%%)\n", tests_passed, tests_run);
     printf("=================================================================\n");

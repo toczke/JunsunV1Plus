@@ -102,7 +102,11 @@ int main(int argc, char** argv) {
     }
 
     if (probe_only) {
-        printf("[+] Probe SUCCESS: DSP responding on %s\n", bus_path);
+        if (dry_run) {
+            printf("[+] [SIMULATION/DRY-RUN] Probe logic test: mock descriptor on %s (CI host has no physical I2C)\n", bus_path);
+        } else {
+            printf("[+] Physical Probe SUCCESS: BD3702FV ACK received on %s (addr: 0x%02X)\n", bus_path, BD3702_SLAVE_ADDR);
+        }
         if (!dry_run && fd >= 0) close(fd);
         return 0;
     }

@@ -38,25 +38,57 @@ static void sig_handler(int sig) {
 }
 
 /*
- * Android-native command execution using /system/bin/sh.
- * Completely avoids glibc's hardcoded dependency on non-existent /bin/sh.
+ * Android-native process execution with fixed arguments (NO SHELL / NO INJECTION).
+ * Avoids /bin/sh or /system/bin/sh entirely, preventing command injection vulnerabilities.
  */
-static void android_exec(const char* cmd) {
-    if (!cmd || !*cmd) return;
+static void spawn_cmd(const char* file, char* const argv[]) {
+    if (!file || !argv) return;
     pid_t pid = fork();
     if (pid == 0) {
-        // Child process
-        const char* sh_path = "/system/bin/sh";
-        if (access(sh_path, X_OK) != 0) {
-            sh_path = "/bin/sh"; // Fallback for host testing
-        }
-        execl(sh_path, "sh", "-c", cmd, (char*)NULL);
+        // Child process: execute binary directly with explicit arguments
+        execv(file, argv);
         _exit(127);
     } else if (pid > 0) {
-        // Detach child / reap asynchronously via waitpid with WNOHANG
         int status;
         waitpid(pid, &status, WNOHANG);
     }
+}
+
+static void send_backcar_broadcast(int reverse_engaged) {
+    char* const argv[] = {
+        (char*)"/system/bin/am",
+        (char*)"broadcast",
+        (char*)"-a",
+        (char*)"android.intent.action.BACKCAR_SERVICE",
+        (char*)"--ez",
+        (char*)"status",
+        (char*)(reverse_engaged ? "true" : "false"),
+        NULL
+    };
+    spawn_cmd("/system/bin/am", argv);
+}
+
+static void send_illum_state(int illum_on) {
+    char* const uimode_argv[] = {
+        (char*)"/system/bin/cmd",
+        (char*)"uimode",
+        (char*)"night",
+        (char*)(illum_on ? "yes" : "no"),
+        NULL
+    };
+    spawn_cmd("/system/bin/cmd", uimode_argv);
+
+    char* const illum_argv[] = {
+        (char*)"/system/bin/am",
+        (char*)"broadcast",
+        (char*)"-a",
+        (char*)"com.topway.action.ILLUM_CHANGED",
+        (char*)"--ez",
+        (char*)"illum",
+        (char*)(illum_on ? "true" : "false"),
+        NULL
+    };
+    spawn_cmd("/system/bin/am", illum_argv);
 }
 
 // -----------------------------------------------------------------------------
@@ -264,23 +296,13 @@ static void handle_mcu_packet(unsigned char cmd, const unsigned char* data, int 
             if (reverse != s_prev_reverse) {
                 s_prev_reverse = reverse;
                 printf("[ts_mcu_daemon] REVERSE GEAR %s\n", reverse ? "ENGAGED" : "DISENGAGED");
-                if (reverse) {
-                    android_exec("/system/bin/am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status true");
-                } else {
-                    android_exec("/system/bin/am broadcast -a android.intent.action.BACKCAR_SERVICE --ez status false");
-                }
+                send_backcar_broadcast(reverse);
             }
 
             if (illum != s_prev_illum) {
                 s_prev_illum = illum;
                 printf("[ts_mcu_daemon] HEADLIGHTS %s -> Switching Theme\n", illum ? "ON" : "OFF");
-                if (illum) {
-                    android_exec("/system/bin/cmd uimode night yes");
-                    android_exec("/system/bin/am broadcast -a com.topway.action.ILLUM_CHANGED --ez illum true");
-                } else {
-                    android_exec("/system/bin/cmd uimode night no");
-                    android_exec("/system/bin/am broadcast -a com.topway.action.ILLUM_CHANGED --ez illum false");
-                }
+                send_illum_state(illum);
             }
         }
     }
