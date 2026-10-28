@@ -106,7 +106,7 @@ run_production_flasher() {
             "$SCRIPT_UNDER_TEST" > "$TEST_DIR/runner.sh"
         chmod +x "$TEST_DIR/runner.sh"
         sed -i 's|-b |-e |g' "$TEST_DIR/runner.sh"
-        "$TEST_DIR/runner.sh" 3 1 "$zip_file" >/dev/null 2>&1
+        sh "$TEST_DIR/runner.sh" 3 1 "$zip_file" >/dev/null 2>&1
     )
     status=$?
     set -e
@@ -206,7 +206,7 @@ pos_ret=$(
         "$SCRIPT_UNDER_TEST" > "$TEST_DIR/pos_runner.sh"
     chmod +x "$TEST_DIR/pos_runner.sh"
     sed -i 's|-b |-e |g' "$TEST_DIR/pos_runner.sh"
-    "$TEST_DIR/pos_runner.sh" 3 1 "$VALID_ZIP" >/dev/null 2>&1
+    sh "$TEST_DIR/pos_runner.sh" 3 1 "$VALID_ZIP" >/dev/null 2>&1
     echo $?
 )
 set -e
