@@ -1,0 +1,6 @@
+id=ts8667-a13-bridge
+name=Topway TS8667 Android 13 Automotive Bridge
+version=v1.0
+versionCode=100
+author=Tomasz Toczek & Antigravity
+description=Automotive hardware bridge for Android 13 GSI: Enables steering wheel controls (uinput), ROHM BD3702FV DSP audio, reverse gear detection, day/night theme sync, and active CPU cooling fan governor.

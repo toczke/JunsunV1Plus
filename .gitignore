@@ -9,7 +9,12 @@ extracted_diagnostics/
 output_images/*.img
 !output_images/README.md
 
-# Large custom ROM binaries and downloaded APKs (stored on pendrive and built via build_packages.sh)
+# Large custom ROM binaries and downloaded APKs
 custom_rom_path2/*.zip
 custom_rom_path2/apks/
 custom_rom_path2/magisk_module/system/
+
+# Large Android 13 AOSP GSI images
+android13_aosp/gsi/*.img
+android13_aosp/gsi/*.img.xz
+!android13_aosp/gsi/README.md

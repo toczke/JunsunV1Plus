@@ -1,0 +1,14 @@
+# ==============================================================================
+# Topway TS8667 Android 13 Automotive Bridge - Properties
+# ==============================================================================
+
+# Force Automotive Landscape Display (1280x720)
+ro.sf.hwrotation=0
+
+# Fluid SurfaceFlinger rendering
+debug.sf.latch_unsignaled=1
+
+# Hardware buttons & UI configuration
+persist.sys.phh.backlight.scale=0
+persist.sys.timezone=Europe/Warsaw
+persist.sys.usb.config=mtp,adb
