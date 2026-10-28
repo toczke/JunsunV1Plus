@@ -135,27 +135,38 @@ In addition to the All-in-One TWRP ZIP, two alternative deployment paths have be
 
 ---
 
-## 4. Hardware Verification & Functionality Matrix
+## 4. Architectural Status & Audit Verification Matrix
 
-| Hardware Subsystem | Mechanism / Driver | Expected Status under AOSP 13 | Audit Assessment |
+> [!WARNING]
+> None of the following subsystems may be considered physically validated ("DZIAŁA") until live runtime logs (logcat, dmesg, and empirical hardware testing) are recorded on the target TS8667 unit. The status below reflects the current stage of codebase development and forensic audit findings.
+
+| Subsystem | Driver / Mechanism | Codebase Implementation Status | Forensic Audit Assessment & Risks |
 |:---|:---|:---:|:---|
-| **Display (1280x720)** | MediaTek DSI / Mali-G52 Gralloc | **PASS** | Native kernel framebuffer; forced landscape via `ro.sf.hwrotation=0`. |
-| **Touch Digitizer** | Goodix GT1151 / GT9886 I2C | **PASS** | Kernel input driver `/dev/input/event1`, fully Treble compatible. |
-| **Wi-Fi & Bluetooth** | MediaTek MT6631 | **PASS** | Vendor HALs in `/vendor` bridge cleanly via TrebleDroid shims. |
-| **Audio Playback** | ROHM BD3702FV + MTK Audio HAL | **PASS** | Unmuted and routed via `bd3702_init` on `/dev/i2c-1`. |
-| **Steering Wheel Keys** | Topway MCU UART `/dev/ttyMT1` | **PASS** | Captured by `ts_mcu_daemon` and injected into kernel `/dev/uinput`. |
-| **Day / Night Theme** | Headlight ILLUM packet from MCU | **PASS** | Handled via `cmd uimode night` within `ts_mcu_daemon`. |
-| **Thermal Cooling** | PWM Fan `/sys/class/leds/fan` | **PASS** | Regulated dynamically by `fan_governor` based on SoC temperature. |
-| **AHD 360/Backup Camera**| Techpoint TP2850 MIPI Bridge | **PENDING** | Video converter requires vendor app `AVM2.apk` / `tp2850.so`. Intent hook is ready. |
-| **Analog FM/AM Radio** | Silicon Labs / NXP TDA7708 I2C | **PENDING** | AOSP lacks FM radio tuner HAL; requires proprietary vendor app `Radio.apk`. |
+| **Base GSI (Android 13)** | TrebleDroid `aosp-arm64-ab-vanilla-13.0` | In Repository (871 MB ZIP) | **UNVERIFIED ON DEVICE:** TrebleDroid shims are theoretical for MT8667; VINTF/SELinux/Gralloc compatibility must be proven via runtime logcat. |
+| **Display (1280x720)** | DRM/KMS + Mali-G52 Gralloc | `ro.sf.hwrotation=0` in `build.prop` | **DESIGN HYPOTHESIS:** Framebuffer orientation forced via prop, but requires verification of hardware composer latching. |
+| **Touchscreen** | Goodix GT1151 / GT9886 I2C | Kernel driver (`/dev/input/event1`) | **HIGH PROBABILITY:** Standard kernel input node, but SELinux context under AOSP 13 must grant framework access. |
+| **Audio Routing (DSP)** | ROHM BD3702FV via `/dev/i2c-1` | [`bd3702_init.c`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/android13_aosp/dsp_audio/bd3702_init.c) | **UNTESTED HARDWARE WRITE:** Static binary writes raw I2C registers (`0x40`). Incorrect registers risk muting hardware or damaging gain stages; requires live verification. |
+| **Steering Wheel (SWC)** | Topway UART `/dev/ttyMT1` + uinput | [`ts_mcu_daemon.c`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/android13_aosp/mcu_daemon/ts_mcu_daemon.c) | **DEFECTS IDENTIFIED IN REVIEW:**<br>1. Line 302 bypasses checksum (`chk_calc == b \|\| 1`).<br>2. glibc `system()` invokes `/bin/sh` (non-existent on pure Android; must use `/system/bin/sh`).<br>3. Frame command mapping based on decompiled heuristics without live UART snooping. |
+| **Thermal Fan Cooling** | PWM Fan `/sys/class/leds/fan` | [`fan_governor.c`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/android13_aosp/thermal/fan_governor.c) | **THEORETICAL MODEL:** Temperature curve (45/52/65 C) is an unmeasured assumption. Must not replace vendor cooling policy without thermal profiling. |
+| **Camera (AHD / 360)** | Techpoint TP2850 MIPI | Pending vendor app extraction | **NON-FUNCTIONAL IN AOSP:** MIPI video converter requires proprietary `AVM2.apk` and `tp2850_*.so` libraries. |
+| **Analog FM Tuner** | NXP/ST TDA7708 I2C | Pending vendor app extraction | **NON-FUNCTIONAL IN AOSP:** AOSP lacks broadcast radio HAL; requires vendor `Radio.apk`. |
+| **Flasher Script** | TWRP `update-binary` (`dd bs=4M`) | [`update-binary`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/android13_aosp/flashable_zip/META-INF/com/google/android/update-binary) | **DESTRUCTIVE OPERATION:** Lacks partition size boundaries, payload integrity hashing, and atomic rollback gates. |
 
 ---
 
-## 5. Strict Operational Isolation from TWRP Testing
+## 5. Audit Review Findings & Mandatory Hardening Plan
 
-> [!IMPORTANT]
-> The Custom ROM build described in this dossier is completely isolated from the current TWRP hardware validation phase.
-> In accordance with the peer auditor's **CONDITIONAL GO — RAM TEST ONLY** verdict:
-> 1. No Custom ROM images (`system.img` or flashable zip) will be installed or flashed during the recovery test.
-> 2. The physical test on the vehicle/test bench is strictly restricted to executing `fastboot boot twrp_junsun_37.img` in volatile RAM.
-> 3. Only after TWRP is confirmed operational in RAM and a proven recovery/unbrick path is verified will Custom ROM flashing be submitted for auditor consideration.
+Based on the peer audit review, the following four hardening actions must be completed before any Custom ROM deployment can be considered:
+
+1. **Rebuild Native Bridges with Android NDK (Bionic):**
+   - Eliminate glibc cross-compilation. All bridges must be built against the Android NDK (targeting `android-29` or `android-33`) using Bionic libc to guarantee correct system paths (`/system/bin/sh`), proper POSIX signal semantics, and Android permission group integration.
+2. **Correct MCU Parser Deficiencies:**
+   - Remove `|| 1` checksum bypass in [`ts_mcu_daemon.c`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/android13_aosp/mcu_daemon/ts_mcu_daemon.c#L302).
+   - Implement explicit `fork()` + `execve("/system/bin/sh", ...)` instead of `system()`.
+   - Capture raw UART frames from `/dev/ttyMT1` on the factory Android 10 system to empirically prove command byte assignments before deploying.
+3. **Flasher Safety Verification Gates:**
+   - Replace raw unverified `dd` piping with explicit device node size verification against `blockdev --getsize64 "$SYS_BLOCK"`.
+   - Compute and enforce SHA-256 checksum of `system.img` before initiating write operations.
+4. **Strict Operational Isolation from TWRP Testing:**
+   - The Custom ROM codebase remains strictly dormant and isolated.
+   - The current operational gate is exclusively **CONDITIONAL GO — RAM TEST ONLY** (`fastboot boot twrp_junsun_37.img`). No ROM flashing or eMMC modifications are permitted.
