@@ -1,0 +1,20 @@
+# ==============================================================================
+# Topway TS8667 / Junsun V1 Plus (MT6768) - Custom Automotive System Properties
+# ==============================================================================
+
+# Force Landscape Display Orientation (1280x720)
+ro.sf.hwrotation=0
+
+# Clean OS Version Spoofing (Enables compatibility with Play Store & MicroG)
+ro.forfan.version.release=10
+ro.forfan.aida64.version.sdk=29
+ro.build.version.release=10
+ro.build.version.sdk=29
+
+# Graphic Rendering & UI Fluidity
+debug.sf.latch_unsignaled=1
+ro.surface_flinger.max_frame_buffer_acquired_buffers=3
+
+# Default System Localization & Peripherals
+persist.sys.timezone=Europe/Warsaw
+persist.sys.usb.config=mtp,adb
