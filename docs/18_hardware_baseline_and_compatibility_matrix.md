@@ -56,7 +56,7 @@
    - Topway 0x2E binary frames are verified with a 5-state synchronous parser enforcing strict XOR checksum `(sum ^ 0xFF) == received_chk` with 100% unit-test coverage.
 
 6. **Settings API Bridge Security Architecture:**
-   - AIDL interface (`ICarSettingsService.aidl`) is guarded by `android.permission.BIND_CAR_SETTINGS_SERVICE`.
+   - AIDL interface (`ICarSettingsService.aidl`) is guarded by `com.topway.carsettingsbridge.permission.BIND_CAR_SETTINGS_SERVICE`.
    - Protection level is enforced as `signatureOrSystem` (not `normal`), preventing unauthorized third-party apps from binding.
    - Runtime security checks in `onBind()` verify caller UID via `checkCallingOrSelfPermission()`.
    - SELinux policy (`car_settings_bridge.te`) confines the app to standard Android property/broadcast IPC, isolating raw I2C and UART nodes to native daemons.

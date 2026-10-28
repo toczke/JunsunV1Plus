@@ -75,11 +75,14 @@ public class CarSettingsService extends Service {
         Log.i(TAG, "CarSettingsService destroyed");
     }
 
+    private static final String PERMISSION_BIND_SETTINGS =
+            "com.topway.carsettingsbridge.permission.BIND_CAR_SETTINGS_SERVICE";
+
     private final ICarSettingsService.Stub mBinder = new ICarSettingsService.Stub() {
         private void enforcePermission() {
             enforceCallingOrSelfPermission(
-                    "android.permission.BIND_CAR_SETTINGS_SERVICE",
-                    "Requires android.permission.BIND_CAR_SETTINGS_SERVICE permission");
+                    PERMISSION_BIND_SETTINGS,
+                    "Requires " + PERMISSION_BIND_SETTINGS + " permission");
         }
 
         @Override
@@ -253,9 +256,9 @@ public class CarSettingsService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        if (checkCallingOrSelfPermission("android.permission.BIND_CAR_SETTINGS_SERVICE")
+        if (checkCallingOrSelfPermission(PERMISSION_BIND_SETTINGS)
                 != PackageManager.PERMISSION_GRANTED) {
-            Log.w(TAG, "Denied bind request from UID " + Binder.getCallingUid() + ": missing BIND_CAR_SETTINGS_SERVICE");
+            Log.w(TAG, "Denied bind request from UID " + Binder.getCallingUid() + ": missing " + PERMISSION_BIND_SETTINGS);
             return null;
         }
         return mBinder;

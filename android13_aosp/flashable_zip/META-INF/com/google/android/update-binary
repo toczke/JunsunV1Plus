@@ -178,11 +178,17 @@ ui_print "[✓] Archive integrity verified (CRC32 valid)."
 # 3. Pinned SHA-256 identity verification of system.img against approved manifest
 # Uses FIFO named pipe to ensure independent exit-code verification for BOTH unzip and sha256sum
 ui_print "- Verifying system.img identity against pinned release SHA-256..."
-WORK_TMP=$(mktemp -d /tmp/topway_flasher.XXXXXX 2>/dev/null || true)
+WORK_TMP=$(mktemp -d /tmp/topway_flasher.XXXXXX 2>/dev/null) || {
+    ui_print "[-] ERROR: Cannot create private temporary directory!"
+    ui_print "    Aborting before modifying physical storage."
+    exit 1
+}
+
 if [ -z "$WORK_TMP" ] || [ ! -d "$WORK_TMP" ]; then
-    ui_print "[-] ERROR: Failed to create secure temporary directory!"
+    ui_print "[-] ERROR: Temporary directory is unavailable or invalid!"
     exit 1
 fi
+
 FIFO_PATH="$WORK_TMP/sha_fifo"
 SHA_TMP="$WORK_TMP/sys_sha"
 

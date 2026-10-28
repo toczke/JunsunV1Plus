@@ -4,20 +4,29 @@
 # ==============================================================================
 # Directly executes the PRODUCTION update-binary script under sandboxed mocks
 # to empirically prove that every safety gate aborts BEFORE any storage write:
-# 1. Incompatible target hardware platform -> MUST exit 1 (0 writes)
-# 2. Malformed / unexpected slot suffix -> MUST exit 1 (0 writes)
-# 3. Missing physical super container -> MUST exit 1 (0 writes)
-# 4. Missing/unmapped mapper logical volume -> MUST exit 1 (0 writes)
-# 5. Corrupted ZIP archive CRC32 -> MUST exit 1 (0 writes)
-# 6. Undersized target partition capacity -> MUST exit 1 (0 writes)
-# 7. Tampered/mismatched SHA-256 hash -> MUST exit 1 (0 writes)
-# 8. Contradictory mixed topology (slot + non-slot on disk) -> MUST exit 1 (0 writes)
-# 9. Contradictory topology (single-slot on disk, but slot reported) -> MUST exit 1 (0 writes)
-# 10. Contradictory topology (slot on disk, but no slot reported) -> MUST exit 1 (0 writes)
-# 11. Missing system.img entry in ZIP archive -> MUST exit 1 (0 writes)
-# 12. FIFO creation failure (mkfifo failure) -> MUST exit 1 (0 writes)
-# 13. Signal termination & cleanup trap verification -> 0 orphans, clean tmp
-# 14. Positive baseline gate pass -> exactly 1 write to mock blockdev, exits 0
+#
+# Category A: Negative Hardware & Topology Safety Gate Tests (Tests 1-11)
+#   1. Incompatible target hardware platform -> MUST exit 1 (0 writes)
+#   2. Malformed / unexpected slot suffix -> MUST exit 1 (0 writes)
+#   3. Missing physical super container -> MUST exit 1 (0 writes)
+#   4. Missing/unmapped mapper logical volume -> MUST exit 1 (0 writes)
+#   5. Corrupted ZIP archive CRC32 -> MUST exit 1 (0 writes)
+#   6. Undersized target partition capacity -> MUST exit 1 (0 writes)
+#   7. Tampered/mismatched SHA-256 hash -> MUST exit 1 (0 writes)
+#   8. Contradictory mixed topology (slot + non-slot on disk) -> MUST exit 1 (0 writes)
+#   9. Contradictory topology (single-slot on disk, but slot reported) -> MUST exit 1 (0 writes)
+#   10. Contradictory topology (slot on disk, but no slot reported) -> MUST exit 1 (0 writes)
+#   11. Missing system.img payload entry in ZIP archive -> MUST exit 1 (0 writes)
+#
+# Category B: Fault Injection & System Failure Tests (Tests 12-13)
+#   12. Private temporary directory failure (mktemp -d failure) -> MUST exit 1 (0 writes)
+#   13. FIFO creation failure (mkfifo failure) -> MUST exit 1 (0 writes)
+#
+# Category C: Signal Interruption & Process Cleanup Test (Test 14)
+#   14. Signal termination & cleanup trap verification (SIGTERM) -> MUST exit 143 (0 writes, 0 orphans)
+#
+# Category D: Positive Baseline Gate Pass (Test 15)
+#   15. Valid baseline configuration -> MUST exit 0, exactly 1 write strictly to mock blockdev
 # ==============================================================================
 
 set -euo pipefail
@@ -56,9 +65,18 @@ esac
 EOF
 chmod +x "$MOCK_BIN/getprop"
 
-# Create mock blockdev
+# Create mock blockdev with physical access barrier
 cat << 'EOF' > "$MOCK_BIN/blockdev"
 #!/bin/sh
+for arg in "$@"; do
+    case "$arg" in
+        /dev/block/*)
+            echo "FATAL BREACH: Mock blockdev attempted access to physical storage: $arg!" >&2
+            exit 99
+            ;;
+    esac
+done
+
 if [ "$1" = "--getsize64" ]; then
     echo "${MOCK_PART_SIZE:-2384809984}"
 elif [ "$1" = "--setrw" ]; then
@@ -95,9 +113,17 @@ exec /bin/dd "$@"
 EOF
 chmod +x "$MOCK_BIN/dd"
 
-# Create mock mount / umount
+# Create mock mount / umount with physical access barrier
 cat << 'EOF' > "$MOCK_BIN/mount"
 #!/bin/sh
+for arg in "$@"; do
+    case "$arg" in
+        /dev/block/*)
+            echo "FATAL BREACH: Mock mount attempted on physical storage: $arg!" >&2
+            exit 99
+            ;;
+    esac
+done
 exit 0
 EOF
 chmod +x "$MOCK_BIN/mount"
@@ -186,12 +212,14 @@ run_production_flasher() {
         writes=$(wc -l < "$MOCK_WRITE_LOG")
     fi
 
-    # Return 0 if script failed (status != 0) AND wrote 0 times
+    # Return 0 if script failed (status != 0) AND wrote exactly 0 times
     if [ "$status" -ne 0 ] && [ "$writes" -eq 0 ]; then
         return 0
     fi
     return 1
 }
+
+echo "--- Category A: Negative Hardware & Topology Safety Gate Tests ---"
 
 # Test 1: Incompatible hardware board
 TESTS_RUN=$((TESTS_RUN + 1))
@@ -202,7 +230,7 @@ else
     echo "[✗] Test 1 FAILED"
 fi
 
-# Test 2: Malformed / unexpected slot suffix (e.g. "_c" or invalid injection string)
+# Test 2: Malformed / unexpected slot suffix
 TESTS_RUN=$((TESTS_RUN + 1))
 if run_production_flasher "spm8667p1_64" "_invalid_slot" 2384809984 1 1 "$TEST_ZIP"; then
     echo "[✓] Test 2 PASSED: Production script rejected malformed slot suffix (code 1, 0 writes)"
@@ -220,7 +248,7 @@ else
     echo "[✗] Test 3 FAILED"
 fi
 
-# Test 4: Unmapped mapper volume (super present but mapper/system missing)
+# Test 4: Unmapped mapper volume
 TESTS_RUN=$((TESTS_RUN + 1))
 if run_production_flasher "spm8667p1_64" "" 2384809984 1 0 "$TEST_ZIP"; then
     echo "[✓] Test 4 PASSED: Production script rejected unmapped mapper device (code 1, 0 writes)"
@@ -229,7 +257,7 @@ else
     echo "[✗] Test 4 FAILED"
 fi
 
-# Test 5: Corrupted ZIP archive
+# Test 5: Corrupted ZIP archive CRC32
 TESTS_RUN=$((TESTS_RUN + 1))
 CORRUPT_ZIP="$TEST_DIR/corrupt.zip"
 echo "Not a valid zip archive file" > "$CORRUPT_ZIP"
@@ -240,7 +268,7 @@ else
     echo "[✗] Test 5 FAILED"
 fi
 
-# Test 6: Undersized partition capacity (e.g. 1.0 GB < 1.93 GB required)
+# Test 6: Undersized partition capacity
 TESTS_RUN=$((TESTS_RUN + 1))
 if run_production_flasher "spm8667p1_64" "" 1000000000 1 1 "$TEST_ZIP"; then
     echo "[✓] Test 6 PASSED: Production script rejected undersized partition capacity (code 1, 0 writes)"
@@ -249,7 +277,7 @@ else
     echo "[✗] Test 6 FAILED"
 fi
 
-# Test 7: Mismatched/Tampered SHA-256 hash (dummy system.img does not match release GSI hash)
+# Test 7: Mismatched/Tampered SHA-256 hash
 TESTS_RUN=$((TESTS_RUN + 1))
 if run_production_flasher "spm8667p1_64" "" 2384809984 1 1 "$TEST_ZIP"; then
     echo "[✓] Test 7 PASSED: Production script rejected mismatched SHA-256 hash (code 1, 0 writes)"
@@ -297,7 +325,52 @@ else
     echo "[✗] Test 11 FAILED"
 fi
 
-# Test 12: FIFO creation failure (mkfifo mocked to fail)
+echo "--- Category B: Fault Injection & System Failure Tests ---"
+
+# Test 12: Private temporary directory creation failure (mktemp -d failure)
+TESTS_RUN=$((TESTS_RUN + 1))
+set +e
+mktemp_fail_ret=$(
+    export PATH="$MOCK_BIN:$PATH"
+    export MOCK_BOARD="spm8667p1_64"
+    export MOCK_SLOT=""
+    export MOCK_PART_SIZE="2384809984"
+    export MOCK_WRITE_LOG="$MOCK_WRITE_LOG"
+    > "$MOCK_WRITE_LOG"
+    rm -rf "$MOCK_BLOCK"
+    mkdir -p "$MOCK_BLOCK/by-name" "$MOCK_BLOCK/mapper"
+    touch "$MOCK_BLOCK/by-name/super" "$MOCK_BLOCK/mapper/system"
+
+    # Replace mktemp with false to simulate creation failure
+    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
+        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+        -e "s|mktemp -d [^)]*|false|g" \
+        "$SCRIPT_UNDER_TEST" > "$TEST_DIR/mktemp_fail_runner.sh"
+    sed -i 's|-b |-e |g' "$TEST_DIR/mktemp_fail_runner.sh"
+    sh "$TEST_DIR/mktemp_fail_runner.sh" 3 1 "$TEST_ZIP" >/dev/null 2>&1
+    ret=$?
+    writes=$(wc -l < "$MOCK_WRITE_LOG")
+
+    # Verify no stray files were created in /
+    stray_root=0
+    [ -e "/sha_fifo" ] && stray_root=1
+    [ -e "/sys_sha" ] && stray_root=1
+
+    if [ "$ret" -eq 1 ] && [ "$writes" -eq 0 ] && [ "$stray_root" -eq 0 ]; then
+        echo 0
+    else
+        echo 1
+    fi
+)
+set -e
+if [ "$mktemp_fail_ret" -eq 0 ]; then
+    echo "[✓] Test 12 PASSED: Production script handled mktemp -d failure safely (code 1, 0 writes, 0 stray files)"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo "[✗] Test 12 FAILED"
+fi
+
+# Test 13: FIFO creation failure (mkfifo failure)
 TESTS_RUN=$((TESTS_RUN + 1))
 set +e
 fifo_fail_ret=$(
@@ -328,13 +401,15 @@ fifo_fail_ret=$(
 )
 set -e
 if [ "$fifo_fail_ret" -eq 0 ]; then
-    echo "[✓] Test 12 PASSED: Production script handled mkfifo failure safely (code 1, 0 writes)"
+    echo "[✓] Test 13 PASSED: Production script handled mkfifo failure safely (code 1, 0 writes)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-    echo "[✗] Test 12 FAILED"
+    echo "[✗] Test 13 FAILED"
 fi
 
-# Test 13: Signal interruption & cleanup trap verification
+echo "--- Category C: Signal Interruption & Process Cleanup Test ---"
+
+# Test 14: Signal interruption & cleanup trap verification
 TESTS_RUN=$((TESTS_RUN + 1))
 set +e
 sig_cleanup_ret=$(
@@ -374,13 +449,15 @@ sig_cleanup_ret=$(
 )
 set -e
 if [ "$sig_cleanup_ret" -eq 0 ]; then
-    echo "[✓] Test 13 PASSED: Signal termination cleaned up child processes safely (code 143, 0 writes)"
+    echo "[✓] Test 14 PASSED: Signal termination cleaned up child processes safely (code 143, 0 writes)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-    echo "[✗] Test 13 FAILED"
+    echo "[✗] Test 14 FAILED"
 fi
 
-# Test 14: Positive Baseline Gate Pass (All gates pass on valid hardware and matching hash)
+echo "--- Category D: Positive Baseline Gate Pass ---"
+
+# Test 15: Positive Baseline Gate Pass (All gates pass on valid hardware and matching hash)
 TESTS_RUN=$((TESTS_RUN + 1))
 VALID_PAYLOAD_DIR="$TEST_DIR/valid_payload"
 mkdir -p "$VALID_PAYLOAD_DIR"
@@ -429,10 +506,10 @@ pos_ret=$(
 )
 set -e
 if [ "$pos_ret" -eq 0 ]; then
-    echo "[✓] Test 14 PASSED: Positive baseline passed all gates and wrote strictly to mock device (1 write)"
+    echo "[✓] Test 15 PASSED: Positive baseline passed all gates and wrote strictly to mock device (1 write)"
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-    echo "[✗] Test 14 FAILED"
+    echo "[✗] Test 15 FAILED"
 fi
 
 echo "================================================================="

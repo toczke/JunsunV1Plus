@@ -43,7 +43,7 @@
         <service
             android:name=".CarSettingsService"
             android:exported="true"
-            android:permission="android.permission.BIND_CAR_SETTINGS_SERVICE">
+            android:permission="com.topway.carsettingsbridge.permission.BIND_CAR_SETTINGS_SERVICE">
             <intent-filter>
                 <action android:name="com.topway.carsettingsbridge.BIND_SERVICE" />
             </intent-filter>
@@ -52,7 +52,7 @@
     </application>
 
     <permission
-        android:name="android.permission.BIND_CAR_SETTINGS_SERVICE"
+        android:name="com.topway.carsettingsbridge.permission.BIND_CAR_SETTINGS_SERVICE"
         android:protectionLevel="signatureOrSystem" />
 
 </manifest>
