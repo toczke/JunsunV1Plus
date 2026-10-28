@@ -65,14 +65,14 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           set +e
           source build/envsetup.sh
-          set -e
+          set -euo pipefail
           lunch omni_ts8667-eng || lunch twrp_ts8667-eng
           BUILD_LOG=$(mktemp)
-          if ! mka recoveryimage -j$(nproc --all) 2>&1 | tee "$BUILD_LOG"; then
-            if grep -q "could not make way for new symlink: root/vendor" "$BUILD_LOG"; then
+          if ! mka recoveryimage -j"$(nproc --all)" 2>&1 | tee "$BUILD_LOG"; then
+            if grep -Fq "could not make way for new symlink: root/vendor" "$BUILD_LOG"; then
               echo "Targeted resolution: clearing conflicting recovery/root/vendor directory..."
               rm -rf out/target/product/ts8667/recovery/root/vendor
-              mka recoveryimage -j$(nproc --all)
+              mka recoveryimage -j"$(nproc --all)"
             else
               echo "ERROR: Build failed with non-rsync error; aborting"
               exit 1
@@ -126,6 +126,12 @@ jobs:
                   raise ValueError(f"Expected Android Boot Image v2, got version {ver}")
               if page_sz not in (2048, 4096):
                   raise ValueError(f"Unexpected page size: {page_sz}")
+              dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
+              hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
+
+              if hdr_sz < 1660:
+                  raise ValueError(f"Invalid header_size for v2: {hdr_sz} (expected >= 1660)")
+
               if k_sz == 0:
                   raise ValueError("Kernel payload size is 0")
               if r_sz == 0:
@@ -134,12 +140,6 @@ jobs:
                   raise ValueError("Recovery DTBO size is 0 (hardware requires DTBO for TS8667 display/touch panel)")
               if dtb_sz == 0:
                   raise ValueError("DTB size is 0 (hardware requires DTB for MT8667 platform boot)")
-
-              dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
-              hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
-
-              if hdr_sz < 1660:
-                  raise ValueError(f"Invalid header_size for v2: {hdr_sz} (expected >= 1660)")
 
               def pad(sz): return ((sz + page_sz - 1) // page_sz) * page_sz
 

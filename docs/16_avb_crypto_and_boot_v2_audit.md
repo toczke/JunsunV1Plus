@@ -3,7 +3,7 @@
 **Platform:** Junsun V1 Plus / Topway TS8667 (`8667Q` / MT8667 / MT6768)  
 **Target Architecture:** ARM64 (`aarch64`), Android 10 (API 29), LittleKernel (LK)  
 **Repository:** [toczke/JunsunV1Plus](https://github.com/toczke/JunsunV1Plus)  
-**Audit Reference Commit:** [`4d646fc`](https://github.com/toczke/JunsunV1Plus/commit/4d646fc)  
+**Audit Reference Commit:** Hardened TWRP Build with `pipefail` & Variable Order Fix
 
 ---
 
