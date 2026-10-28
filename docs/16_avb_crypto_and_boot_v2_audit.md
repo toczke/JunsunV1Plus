@@ -176,21 +176,34 @@ def validate_v2_image(path):
         assert dtbo_magic == 0xd7b7ab1e, f"Invalid DTBO table magic: 0x{dtbo_magic:08x}"
         assert dtbo_total_sz == dtbo_sz, f"DTBO total_size mismatch: table {dtbo_total_sz} != header {dtbo_sz}"
 
-        # 3. DTB Table Header, Entry 0, and FDT Magic validation
+        # 3. DTB Table Header, Entry 0, and FDT Magic validation with strict bounds checks
         off_dtb = dtbo_off + pad(dtbo_sz)
         f.seek(off_dtb)
         dtb_hdr = f.read(32)
-        dtb_magic, dtb_total_sz, _, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_hdr[:24])
+        assert len(dtb_hdr) == 32, "Truncated DTB table header"
+        dtb_magic, dtb_total_sz, dtb_hdr_sz, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_hdr[:24])
         assert dtb_magic == 0xd7b7ab1e, f"Invalid DTB magic: 0x{dtb_magic:08x}"
-        assert dtb_total_sz == dtb_sz, f"DTB total_size mismatch: table {dtb_total_sz} != header {dtb_sz}"
+        assert dtb_total_sz == dtb_sz and dtb_total_sz >= 32, "Invalid DTB total_size"
+        assert dtb_hdr_sz >= 32, "Invalid DTB header size"
+        assert entry_sz >= 8, "Invalid DTB entry size"
+        assert entries_off >= dtb_hdr_sz, "Invalid DTB entries offset"
         assert entry_count >= 1, "DTB table has no entries"
 
-        # Read Entry 0 pointing to FDT payload
+        entries_end = entries_off + (entry_count * entry_sz)
+        assert entries_end <= dtb_total_sz, "DTB entries exceed table boundary"
+
+        # Read Entry 0 pointing to FDT payload and verify within bounds
         f.seek(off_dtb + entries_off)
         entry0 = f.read(entry_sz)
+        assert len(entry0) >= 8, "Truncated DTB entry 0"
         entry0_sz, entry0_off = struct.unpack(">II", entry0[:8])
+        assert entry0_off >= entries_end, "Entry 0 overlaps entries table"
+        assert (entry0_off + entry0_sz) <= dtb_total_sz, "Entry 0 exceeds DTB table boundary"
+
         f.seek(off_dtb + entry0_off)
-        fdt_magic, fdt_totalsize = struct.unpack(">II", f.read(8))
+        fdt_hdr = f.read(8)
+        assert len(fdt_hdr) == 8, "Truncated FDT header"
+        fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
         assert fdt_magic == 0xd00dfeed, f"Invalid FDT magic: 0x{fdt_magic:08x}"
         assert fdt_totalsize == entry0_sz, f"FDT totalsize {fdt_totalsize} != entry dt_size {entry0_sz}"
 
@@ -243,4 +256,4 @@ Before any flashing is approved for end users, the recovery image must pass the 
 | Run ID | Commit | Description | Artifact Output | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | [`40661162555`](https://github.com/toczke/JunsunV1Plus/actions/runs/40661162555) | `c777980` | Flasher APK Build | `app-debug.apk` (`f05f7200...`) | **SUCCESS** |
-| [`40666992896`](https://github.com/toczke/JunsunV1Plus/actions/runs/40666992896) | [`07a5e10`](https://github.com/toczke/JunsunV1Plus/commit/07a5e10) | Hardened TWRP Build (Pipefail & Variable Order Fix) | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **IN PROGRESS** |
+| `pending` | `HEAD` | Hardened TWRP Build (Bounds Check & Lunch Error Handling) | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **QUEUED** |

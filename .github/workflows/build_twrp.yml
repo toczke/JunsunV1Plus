@@ -63,9 +63,19 @@ jobs:
         run: |
           cd ~/twrp
           export ALLOW_MISSING_DEPENDENCIES=true
-          set +e
-          source build/envsetup.sh
-          lunch omni_ts8667-eng || lunch twrp_ts8667-eng
+          set +u
+          source build/envsetup.sh || {
+            echo "ERROR: envsetup.sh failed"
+            exit 1
+          }
+
+          if ! lunch omni_ts8667-eng; then
+            if ! lunch twrp_ts8667-eng; then
+              echo "ERROR: No valid lunch target found"
+              exit 1
+            fi
+          fi
+
           set -e
           set -o pipefail
           BUILD_LOG=$(mktemp)
@@ -167,27 +177,52 @@ jobs:
               else:
                   off_dtb = off_s + pad(s_sz)
 
-              # Validate DTB structure, entry 0, and internal FDT payload
+              # Validate DTB structure, entry 0, and internal FDT payload with strict bounds checks
               if dtb_sz > 0:
                   f.seek(off_dtb)
                   dtb_table_hdr = f.read(32)
-                  dtb_magic, dtb_total_sz, _, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_table_hdr[:24])
+                  if len(dtb_table_hdr) != 32:
+                      raise ValueError(f"Truncated DTB table header: read {len(dtb_table_hdr)} bytes < 32")
+                  dtb_magic, dtb_total_sz, dtb_hdr_sz, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_table_hdr[:24])
                   if dtb_magic != 0xd7b7ab1e:
                       raise ValueError(f"Invalid DTB magic at {off_dtb}: 0x{dtb_magic:08x} (expected 0xd7b7ab1e)")
-                  if dtb_total_sz != dtb_sz:
-                      raise ValueError(f"DTB total_size mismatch: table header {dtb_total_sz} != boot header {dtb_sz}")
+                  if dtb_total_sz != dtb_sz or dtb_total_sz < 32:
+                      raise ValueError(f"Invalid DTB table size: {dtb_total_sz} != {dtb_sz} or < 32")
+                  if dtb_hdr_sz < 32:
+                      raise ValueError(f"Invalid DTB header size: {dtb_hdr_sz} < 32")
+                  if entry_sz < 8:
+                      raise ValueError(f"Invalid DTB entry size: {entry_sz} < 8")
+                  if entries_off < dtb_hdr_sz:
+                      raise ValueError(f"Invalid DTB entries offset: {entries_off} < {dtb_hdr_sz}")
                   if entry_count < 1:
                       raise ValueError("DTB table contains 0 entries")
-                  
-                  # Verify Entry 0 and FDT payload at internal offset
+
+                  entries_end = entries_off + (entry_count * entry_sz)
+                  if entries_end > dtb_total_sz:
+                      raise ValueError(f"DTB entries boundary {entries_end} exceeds table size {dtb_total_sz}")
+
+                  # Verify Entry 0 and FDT payload within table boundaries
                   f.seek(off_dtb + entries_off)
-                  entry0_sz, entry0_off = struct.unpack(">II", f.read(8))
+                  entry0_data = f.read(entry_sz)
+                  if len(entry0_data) < 8:
+                      raise ValueError("Truncated entry 0 read in DTB table")
+                  entry0_sz, entry0_off = struct.unpack(">II", entry0_data[:8])
+
+                  if entry0_off < entries_end:
+                      raise ValueError(f"Entry 0 offset {entry0_off} overlaps entries table (end={entries_end})")
+                  if (entry0_off + entry0_sz) > dtb_total_sz:
+                      raise ValueError(f"Entry 0 FDT payload {entry0_off + entry0_sz} exceeds DTB table size {dtb_total_sz}")
+
                   f.seek(off_dtb + entry0_off)
-                  fdt_magic, fdt_totalsize = struct.unpack(">II", f.read(8))
+                  fdt_hdr = f.read(8)
+                  if len(fdt_hdr) != 8:
+                      raise ValueError("Truncated FDT header read")
+                  fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
                   if fdt_magic != 0xd00dfeed:
                       raise ValueError(f"Invalid FDT magic at DTB entry 0 offset +{entry0_off}: 0x{fdt_magic:08x} (expected 0xd00dfeed)")
                   if fdt_totalsize != entry0_sz:
                       raise ValueError(f"FDT totalsize {fdt_totalsize} != entry 0 dt_size {entry0_sz}")
+
                   print(f"Validated DTB table at {off_dtb}: size={dtb_total_sz}, entry 0 FDT at +{entry0_off} (size={fdt_totalsize} bytes)")
                   total_payload = off_dtb + pad(dtb_sz)
               else:
