@@ -67,11 +67,18 @@ jobs:
           source build/envsetup.sh
           set -e
           lunch omni_ts8667-eng || lunch twrp_ts8667-eng
-          mka recoveryimage -j$(nproc --all) || {
-            echo "Resolving AOSP rsync symlink conflict on recovery/root/vendor..."
-            rm -rf out/target/product/ts8667/recovery/root/vendor
-            mka recoveryimage -j$(nproc --all)
-          }
+          BUILD_LOG=$(mktemp)
+          if ! mka recoveryimage -j$(nproc --all) 2>&1 | tee "$BUILD_LOG"; then
+            if grep -q "could not make way for new symlink: root/vendor" "$BUILD_LOG"; then
+              echo "Targeted resolution: clearing conflicting recovery/root/vendor directory..."
+              rm -rf out/target/product/ts8667/recovery/root/vendor
+              mka recoveryimage -j$(nproc --all)
+            else
+              echo "ERROR: Build failed with non-rsync error; aborting"
+              exit 1
+            fi
+          fi
+          rm -f "$BUILD_LOG"
 
       - name: Prepare Artifacts & Add AVB Hash Footer
         run: |
@@ -119,8 +126,14 @@ jobs:
                   raise ValueError(f"Expected Android Boot Image v2, got version {ver}")
               if page_sz not in (2048, 4096):
                   raise ValueError(f"Unexpected page size: {page_sz}")
-              if k_sz == 0 or r_sz == 0:
-                  raise ValueError(f"Empty kernel or ramdisk payload: k_sz={k_sz}, r_sz={r_sz}")
+              if k_sz == 0:
+                  raise ValueError("Kernel payload size is 0")
+              if r_sz == 0:
+                  raise ValueError("Ramdisk payload size is 0")
+              if dtbo_sz == 0:
+                  raise ValueError("Recovery DTBO size is 0 (hardware requires DTBO for TS8667 display/touch panel)")
+              if dtb_sz == 0:
+                  raise ValueError("DTB size is 0 (hardware requires DTB for MT8667 platform boot)")
 
               dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
               hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
@@ -177,6 +190,9 @@ jobs:
 
               if total_payload > 33484800:
                   raise ValueError(f"Payload {total_payload} exceeds max allowed size 33484800 for 32MB partition")
+
+              if current_sz < total_payload:
+                  raise ValueError(f"Truncated input image: current file size {current_sz} bytes < required payload {total_payload} bytes")
 
               if current_sz > total_payload:
                   print(f"Truncating {target_path} from {current_sz} to exact payload {total_payload} bytes")
