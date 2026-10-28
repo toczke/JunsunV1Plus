@@ -91,11 +91,32 @@ if [ -z "$SUPER_DEV" ]; then
 fi
 ui_print "[✓] Found dynamic partition container: $SUPER_DEV"
 
-# 2. Check slot status from bootloader properties & partition names
+# 2. Check slot status from bootloader properties & partition names with strict validation
 SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null || true)
+case "$SLOT" in
+    ""|"_a"|"_b")
+        # Valid standard slot suffix
+        ;;
+    *)
+        ui_print "[-] ERROR: Malformed or unexpected slot suffix: '$SLOT'"
+        ui_print "    Aborting before modifying physical eMMC storage."
+        exit 1
+        ;;
+esac
+
 HAS_SLOT_A=0
+HAS_SYSTEM_PLAIN=0
 [ -b /dev/block/by-name/system_a ] && HAS_SLOT_A=1
 [ -b /dev/block/mapper/system_a ] && HAS_SLOT_A=1
+[ -b /dev/block/by-name/system ] && HAS_SYSTEM_PLAIN=1
+[ -b /dev/block/mapper/system ] && HAS_SYSTEM_PLAIN=1
+
+if [ "$HAS_SLOT_A" -eq 1 ] && [ "$HAS_SYSTEM_PLAIN" -eq 1 ] && [ -z "$SLOT" ]; then
+    ui_print "[-] ERROR: Ambiguous partition layout! Both slot and non-slot system devices exist"
+    ui_print "    without an explicit ro.boot.slot_suffix from bootloader."
+    ui_print "    Aborting before modifying physical storage."
+    exit 1
+fi
 
 if [ -n "$SLOT" ] || [ "$HAS_SLOT_A" -eq 1 ]; then
     [ -z "$SLOT" ] && SLOT="_a"
@@ -127,19 +148,42 @@ fi
 ui_print "[✓] Archive integrity verified (CRC32 valid)."
 
 # 2. Pinned SHA-256 identity verification of system.img against approved manifest
+# Uses FIFO named pipe to ensure independent exit-code verification for BOTH unzip and sha256sum
 ui_print "- Verifying system.img identity against pinned release SHA-256..."
+FIFO_PATH="/tmp/sha_fifo.$$"
 SHA_TMP="/tmp/sys_sha.$$"
-rm -f "$SHA_TMP"
-if ! ( unzip -p "$ZIPFILE" system.img | sha256sum > "$SHA_TMP" ); then
-    ui_print "[-] ERROR: Streaming system.img for SHA-256 calculation failed!"
+rm -f "$FIFO_PATH" "$SHA_TMP"
+mkfifo "$FIFO_PATH"
+
+sha256sum < "$FIFO_PATH" > "$SHA_TMP" 2>/dev/null &
+SHA_PID=$!
+
+UNZIP_OK=1
+if ! unzip -p "$ZIPFILE" system.img > "$FIFO_PATH" 2>/dev/null; then
+    UNZIP_OK=0
+fi
+
+wait "$SHA_PID" 2>/dev/null
+SHA_STATUS=$?
+rm -f "$FIFO_PATH"
+
+if [ "$UNZIP_OK" -ne 1 ]; then
+    ui_print "[-] ERROR: Streaming system.img from ZIP archive failed!"
     rm -f "$SHA_TMP"
     exit 1
 fi
+
+if [ "$SHA_STATUS" -ne 0 ]; then
+    ui_print "[-] ERROR: sha256sum calculation failed with status $SHA_STATUS!"
+    rm -f "$SHA_TMP"
+    exit 1
+fi
+
 ACTUAL_SHA256=$(awk '{print $1}' "$SHA_TMP" 2>/dev/null || echo "")
 rm -f "$SHA_TMP"
 
 if [ -z "$ACTUAL_SHA256" ]; then
-    ui_print "[-] ERROR: Failed to compute SHA-256 digest from archive stream!"
+    ui_print "[-] ERROR: Failed to compute SHA-256 digest from stream!"
     exit 1
 fi
 
