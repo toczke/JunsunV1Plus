@@ -2,8 +2,11 @@
 # <src>                                              <mnt_point> <type> <mnt_flags and options>                             <fs_mgr_flags>
 
 /system         ext4    system                          flags=display="System";backup=1;logical
+/system_image   emmc    system                          flags=display="System Image";backup=1;flashimg=1;logical
 /vendor         ext4    vendor                          flags=display="Vendor";backup=1;logical
+/vendor_image   emmc    vendor                          flags=display="Vendor Image";backup=1;flashimg=1;logical
 /product        ext4    product                         flags=display="Product";backup=1;logical
+/product_image  emmc    product                         flags=display="Product Image";backup=1;flashimg=1;logical
 /super          emmc    /dev/block/by-name/super        flags=display="Super (Dynamic Container)";backup=1;flashimg=1
 
 /data           ext4    /dev/block/by-name/userdata     flags=display="Data";encryptable=userdata;fileencryption=aes-256-xts
