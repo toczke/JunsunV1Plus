@@ -91,7 +91,7 @@ if [ -z "$SUPER_DEV" ]; then
 fi
 ui_print "[✓] Found dynamic partition container: $SUPER_DEV"
 
-# 2. Check slot status from bootloader properties & partition names with strict validation
+# 2. Check slot status from bootloader properties & partition names with strict multi-factor validation
 SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null || true)
 case "$SLOT" in
     ""|"_a"|"_b")
@@ -105,26 +105,40 @@ case "$SLOT" in
 esac
 
 HAS_SLOT_A=0
+HAS_SLOT_B=0
 HAS_SYSTEM_PLAIN=0
-[ -b /dev/block/by-name/system_a ] && HAS_SLOT_A=1
-[ -b /dev/block/mapper/system_a ] && HAS_SLOT_A=1
-[ -b /dev/block/by-name/system ] && HAS_SYSTEM_PLAIN=1
-[ -b /dev/block/mapper/system ] && HAS_SYSTEM_PLAIN=1
-
-if [ "$HAS_SLOT_A" -eq 1 ] && [ "$HAS_SYSTEM_PLAIN" -eq 1 ] && [ -z "$SLOT" ]; then
-    ui_print "[-] ERROR: Ambiguous partition layout! Both slot and non-slot system devices exist"
-    ui_print "    without an explicit ro.boot.slot_suffix from bootloader."
-    ui_print "    Aborting before modifying physical storage."
-    exit 1
+if [ -b /dev/block/by-name/system_a ] || [ -b /dev/block/mapper/system_a ]; then
+    HAS_SLOT_A=1
+fi
+if [ -b /dev/block/by-name/system_b ] || [ -b /dev/block/mapper/system_b ]; then
+    HAS_SLOT_B=1
+fi
+if [ -b /dev/block/by-name/system ] || [ -b /dev/block/mapper/system ]; then
+    HAS_SYSTEM_PLAIN=1
 fi
 
-if [ -n "$SLOT" ] || [ "$HAS_SLOT_A" -eq 1 ]; then
-    [ -z "$SLOT" ] && SLOT="_a"
-    ui_print "  Topology: Slot-based A/B Dynamic Partitions (Slot: $SLOT)"
+# Strict multi-factor topology check
+if [ "$HAS_SLOT_A" -eq 1 ] || [ "$HAS_SLOT_B" -eq 1 ]; then
+    # A/B topology detected on disk
+    if [ -z "$SLOT" ]; then
+        ui_print "[-] ERROR: A/B partition topology detected, but bootloader provided no active slot suffix!"
+        ui_print "    Refusing to guess active slot. Aborting before modifying storage."
+        exit 1
+    fi
     SYS_BLOCK="/dev/block/mapper/system${SLOT}"
-else
-    ui_print "  Topology: Single-slot A-only Dynamic Partitions"
+    ui_print "  Topology: Verified Slot-based A/B Dynamic Partitions (Target: $SYS_BLOCK)"
+elif [ "$HAS_SYSTEM_PLAIN" -eq 1 ]; then
+    # Single-slot topology detected on disk
+    if [ -n "$SLOT" ]; then
+        ui_print "[-] ERROR: Contradictory topology! Single-slot layout on disk, but bootloader reported slot '$SLOT'!"
+        ui_print "    Aborting before modifying storage."
+        exit 1
+    fi
     SYS_BLOCK="/dev/block/mapper/system"
+    ui_print "  Topology: Verified Single-slot A-only Dynamic Partitions (Target: $SYS_BLOCK)"
+else
+    ui_print "[-] ERROR: No recognizable system partition found in device-mapper or by-name table!"
+    exit 1
 fi
 
 # 3. Verify that the dynamic logical partition is actively mapped by TWRP
@@ -139,7 +153,13 @@ ui_print "[✓] Verified active logical system block device: $SYS_BLOCK"
 # ------------------------------------------------------------------------------
 # GATE 3: Pre-Flash Image Integrity, Format & Pinned Hash Verification
 # ------------------------------------------------------------------------------
-# 1. Archive CRC32 verification
+# 1. Existence of system.img in archive
+if ! unzip -l "$ZIPFILE" system.img >/dev/null 2>&1; then
+    ui_print "[-] ERROR: Payload entry 'system.img' not found inside $ZIPFILE!"
+    exit 1
+fi
+
+# 2. Archive CRC32 verification
 ui_print "- Testing ZIP archive integrity (CRC32)..."
 if ! unzip -t "$ZIPFILE" system.img >/dev/null 2>&1; then
     ui_print "[-] ERROR: system.img archive verification failed! ZIP archive corrupted."
@@ -147,13 +167,26 @@ if ! unzip -t "$ZIPFILE" system.img >/dev/null 2>&1; then
 fi
 ui_print "[✓] Archive integrity verified (CRC32 valid)."
 
-# 2. Pinned SHA-256 identity verification of system.img against approved manifest
+# 3. Pinned SHA-256 identity verification of system.img against approved manifest
 # Uses FIFO named pipe to ensure independent exit-code verification for BOTH unzip and sha256sum
 ui_print "- Verifying system.img identity against pinned release SHA-256..."
 FIFO_PATH="/tmp/sha_fifo.$$"
 SHA_TMP="/tmp/sys_sha.$$"
 rm -f "$FIFO_PATH" "$SHA_TMP"
-mkfifo "$FIFO_PATH"
+
+clean_fifo_trap() {
+    rm -f "$FIFO_PATH" "$SHA_TMP" 2>/dev/null || true
+    if [ -n "${SHA_PID:-}" ]; then
+        kill "$SHA_PID" 2>/dev/null || true
+    fi
+}
+trap clean_fifo_trap EXIT HUP INT TERM
+
+if ! mkfifo "$FIFO_PATH" 2>/dev/null; then
+    ui_print "[-] ERROR: Failed to create temporary FIFO named pipe at $FIFO_PATH!"
+    rm -f "$SHA_TMP"
+    exit 1
+fi
 
 sha256sum < "$FIFO_PATH" > "$SHA_TMP" 2>/dev/null &
 SHA_PID=$!
@@ -182,8 +215,8 @@ fi
 ACTUAL_SHA256=$(awk '{print $1}' "$SHA_TMP" 2>/dev/null || echo "")
 rm -f "$SHA_TMP"
 
-if [ -z "$ACTUAL_SHA256" ]; then
-    ui_print "[-] ERROR: Failed to compute SHA-256 digest from stream!"
+if [ -z "$ACTUAL_SHA256" ] || [ "${#ACTUAL_SHA256}" -ne 64 ]; then
+    ui_print "[-] ERROR: Failed to compute valid 64-character SHA-256 digest from stream!"
     exit 1
 fi
 

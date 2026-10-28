@@ -105,9 +105,7 @@ run_production_flasher() {
             -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
             "$SCRIPT_UNDER_TEST" > "$TEST_DIR/runner.sh"
         chmod +x "$TEST_DIR/runner.sh"
-        sed -i 's|-b "\$sdev"|-e "\$sdev"|g' "$TEST_DIR/runner.sh"
-        sed -i 's|-b "\$dev"|-e "\$dev"|g' "$TEST_DIR/runner.sh"
-        sed -i 's|-b "\$SYS_BLOCK"|-e "\$SYS_BLOCK"|g' "$TEST_DIR/runner.sh"
+        sed -i 's|-b |-e |g' "$TEST_DIR/runner.sh"
         "$TEST_DIR/runner.sh" 3 1 "$zip_file" >/dev/null 2>&1
     )
     status=$?
@@ -178,6 +176,45 @@ if ! run_production_flasher "spm8667p1_64" "" 2384809984 1 1 "$TEST_ZIP"; then
     TESTS_PASSED=$((TESTS_PASSED + 1))
 else
     echo "[✗] Test 7 FAILED"
+fi
+
+# Test 8: Positive Baseline Gate Pass (All gates pass on valid hardware and matching hash)
+TESTS_RUN=$((TESTS_RUN + 1))
+VALID_PAYLOAD_DIR="$TEST_DIR/valid_payload"
+mkdir -p "$VALID_PAYLOAD_DIR"
+echo "TS8667 Valid Test Ext4 Superblock System Image Content" > "$VALID_PAYLOAD_DIR/system.img"
+VALID_ZIP="$TEST_DIR/valid_test_package.zip"
+zip -j "$VALID_ZIP" "$VALID_PAYLOAD_DIR/system.img" >/dev/null
+VALID_SHA=$(sha256sum "$VALID_PAYLOAD_DIR/system.img" | awk '{print $1}')
+
+set +e
+pos_ret=$(
+    export PATH="$MOCK_BIN:$PATH"
+    export MOCK_BOARD="spm8667p1_64"
+    export MOCK_SLOT=""
+    export MOCK_PART_SIZE="2384809984"
+    rm -rf "$MOCK_BLOCK"
+    mkdir -p "$MOCK_BLOCK/by-name" "$MOCK_BLOCK/mapper"
+    touch "$MOCK_BLOCK/by-name/super"
+    touch "$MOCK_BLOCK/mapper/system"
+
+    # Replace EXPECTED_SHA256 with test payload hash and mock write target
+    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
+        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+        -e "s|EXPECTED_SHA256=\".*\"|EXPECTED_SHA256=\"$VALID_SHA\"|g" \
+        -e "s|conv=fsync||g" \
+        "$SCRIPT_UNDER_TEST" > "$TEST_DIR/pos_runner.sh"
+    chmod +x "$TEST_DIR/pos_runner.sh"
+    sed -i 's|-b |-e |g' "$TEST_DIR/pos_runner.sh"
+    "$TEST_DIR/pos_runner.sh" 3 1 "$VALID_ZIP" >/dev/null 2>&1
+    echo $?
+)
+set -e
+if [ "$pos_ret" -eq 0 ]; then
+    echo "[✓] Test 8 PASSED: Positive baseline configuration passed all safety gates and completed cleanly"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+    echo "[✗] Test 8 FAILED (positive test returned $pos_ret)"
 fi
 
 echo "================================================================="
