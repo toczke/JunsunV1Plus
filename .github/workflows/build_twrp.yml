@@ -36,7 +36,7 @@ jobs:
             git-core gnupg flex bison build-essential zip curl zlib1g-dev \
             gcc-multilib g++-multilib libc6-dev-i386 libncurses5 lib32ncurses5-dev \
             x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils \
-            xsltproc unzip fontconfig libssl-dev python3 python-is-python3 rsync bc
+            xsltproc unzip fontconfig libssl-dev python3 python-is-python3 rsync bc ccache
 
       - name: Install Repo Tool
         run: |
@@ -59,10 +59,24 @@ jobs:
           mkdir -p ~/twrp/device/topway/ts8667
           cp -r twrp_device_tree/* ~/twrp/device/topway/ts8667/
 
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.ccache
+          key: twrp-ccache-v1-${{ runner.os }}-ubuntu-22.04-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            twrp-ccache-v1-Linux-ubuntu-22.04-
+
       - name: Build TWRP Recovery
+        id: build
         run: |
           cd ~/twrp
           export ALLOW_MISSING_DEPENDENCIES=true
+          export USE_CCACHE=1
+          export CCACHE_DIR="$HOME/.ccache"
+          mkdir -p "$CCACHE_DIR"
+          ccache -M 5G
+          ccache -z
           # Note on nounset (+u): AOSP build scripts (envsetup.sh, lunch, mka) rely on
           # bash treating uninitialized variables as empty strings (e.g. build/envsetup.sh:646).
           # Enabling set -u breaks AOSP tools with "unbound variable".
@@ -94,6 +108,14 @@ jobs:
             fi
           fi
           rm -f "$BUILD_LOG"
+          ccache -s
+
+      - name: Save ccache
+        if: steps.build.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: twrp-ccache-v1-${{ runner.os }}-ubuntu-22.04-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Prepare Artifacts & Add AVB Hash Footer
         run: |
