@@ -350,12 +350,13 @@ public class MainActivity extends Activity {
                 String chk = executeRootCommand("[ -s " + backupPath + " ] && stat -c%s " + backupPath + " 2>/dev/null || echo 0").trim();
                 long backupSize = 0;
                 try { backupSize = Long.parseLong(chk); } catch (Exception ignored) {}
-                if (backupSize < 30000000) {
-                    log("[CRITICAL ERROR] Pre-flash boot backup verification failed (size=" + backupSize + " bytes)!");
+                if (backupSize != 33554432L) {
+                    log("[CRITICAL ERROR] Pre-flash boot backup verification failed! Expected 33554432 bytes, got " + backupSize + " bytes.");
                     log("Aborting flash immediately to protect device integrity.");
                     return;
                 }
-                log("Pre-flash boot backup verified (" + backupSize + " bytes).");
+                String backupHash = computeFileSha256(backupPath, backupSize);
+                log("Pre-flash boot backup verified (exact 32MB: " + backupSize + " bytes, SHA-256=" + backupHash + ").");
 
                 // Also copy backup to USB storage alongside source image if possible
                 try {
@@ -439,12 +440,13 @@ public class MainActivity extends Activity {
                 String chk = executeRootCommand("[ -s " + backupPath + " ] && stat -c%s " + backupPath + " 2>/dev/null || echo 0").trim();
                 long backupSize = 0;
                 try { backupSize = Long.parseLong(chk); } catch (Exception ignored) {}
-                if (backupSize < 30000000) {
-                    log("[CRITICAL ERROR] Pre-flash recovery backup verification failed (size=" + backupSize + " bytes)!");
+                if (backupSize != 33554432L) {
+                    log("[CRITICAL ERROR] Pre-flash recovery backup verification failed! Expected 33554432 bytes, got " + backupSize + " bytes.");
                     log("Aborting flash immediately to protect device integrity.");
                     return;
                 }
-                log("Pre-flash recovery backup verified (" + backupSize + " bytes).");
+                String backupHash = computeFileSha256(backupPath, backupSize);
+                log("Pre-flash recovery backup verified (exact 32MB: " + backupSize + " bytes, SHA-256=" + backupHash + ").");
 
                 // Also copy backup to USB storage alongside source image if possible
                 try {
