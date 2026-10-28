@@ -94,26 +94,34 @@ The CI workflow validates that both sections exist, start with valid magics, and
 
 ## 3. Cryptographic Signature & Hash Descriptor Verification
 
-To satisfy the auditor's requirement for independent cryptographic proof (rather than mere structural inspection), the workflow executes both `avbtool info_image` and `avbtool verify_image`:
+To satisfy the auditor's requirement for independent cryptographic proof (rather than mere structural inspection), the workflow executes both `avbtool info_image` and `avbtool verify_image` with explicit public key verification:
 
 ```bash
-# Cryptographic verification of signature and payload hash
+# 1. Extract public keys in both standard PEM format and binary AVB format
+openssl pkey -in "$AVB_KEY" -pubout -out /tmp/verify_twrp/avb_key_pub.pem
+sha256sum /tmp/verify_twrp/avb_key_pub.pem > avb_key_pub_pem_sha256.txt
+
+"${avbtool_cmd[@]}" extract_public_key --key "$AVB_KEY" --output /tmp/verify_twrp/avb_key.bin
+sha256sum /tmp/verify_twrp/avb_key.bin > avb_key_bin_sha256.txt
+
+# 2. Cryptographic verification of signature and payload hash against PEM public key
 mkdir -p /tmp/verify_twrp
 cp ./twrp_raw.img /tmp/verify_twrp/recovery.img
-"${avbtool_cmd[@]}" verify_image --image /tmp/verify_twrp/recovery.img > avb_crypto_verification.txt
+"${avbtool_cmd[@]}" verify_image --image /tmp/verify_twrp/recovery.img --key /tmp/verify_twrp/avb_key_pub.pem > avb_crypto_verification.txt
 ```
 
 ### 3.1 Verification Output
 ```text
-Verifying image /tmp/verify_twrp/recovery.img using embedded public key
+Verifying image /tmp/verify_twrp/recovery.img using key at /tmp/verify_twrp/avb_key_pub.pem
 vbmeta: Successfully verified footer and SHA256_RSA2048 vbmeta struct in /tmp/verify_twrp/recovery.img
 recovery: Successfully verified sha256 hash of /tmp/verify_twrp/recovery.img for image of 29984768 bytes
 ```
 
-### 3.2 Security Implications
-1. **vbmeta Struct Verification:** Verifies the cryptographic RSA-2048 signature using the embedded public key.
-2. **Hash Descriptor Verification:** Verifies that the SHA-256 hash of the exact binary payload (`29,984,768` bytes) matches the hash stored in the signed descriptor with zero bit discrepancy.
-3. **Partition Size Integrity:** Verifies the overall image length is exactly 33,554,432 bytes (32 MiB).
+### 3.2 Security Implications & Key Formats
+1. **Format Distinction (PEM vs. AVB Binary):** `avbtool verify_image --key` strictly expects a standard OpenSSL PEM-encoded public key (`-----BEGIN PUBLIC KEY-----`). In contrast, `avbtool extract_public_key` produces a serialized binary `AvbRSAPublicKeyHeader` struct designed for bootloader hardware storage. Supplying the binary format to `verify_image` causes an ASN.1 parsing failure. The workflow produces both representations with distinct SHA-256 digests.
+2. **vbmeta Struct Verification:** Verifies the cryptographic RSA-2048 signature using the specified PEM public key.
+3. **Hash Descriptor Verification:** Verifies that the SHA-256 hash of the exact binary payload (`29,984,768` bytes) matches the hash stored in the signed descriptor with zero bit discrepancy.
+4. **Partition Size Integrity:** Verifies the overall image length is exactly 33,554,432 bytes (32 MiB).
 
 ---
 
