@@ -103,7 +103,10 @@ An empirical structural extraction of the factory firmware images dumped directl
   - Header Magic: `0xd7b7ab1e` (`DT_TABLE_MAGIC`)
   - Total Size: `105,691` bytes (matches boot header `dtb_sz: 105691`)
 
-This proves that the OEM bootloader (LittleKernel) and kernel on the TS8667 platform strictly expect the DTB section to be encapsulated in an **Android DT Table (`0xd7b7ab1e`)**, confirming that the CI validator's enforcement of `0xd7b7ab1e` reflects the genuine hardware expectation of the device, rather than an arbitrary format choice.
+**Methodological Distinctions and Conclusions:**
+1. **Empirically Confirmed:** Factory `boot.img` and `recovery.img` binaries dumped from the physical TS8667 hardware encapsulate the DTB section in an Android DT Table (`0xd7b7ab1e`).
+2. **Strongly Justified:** TWRP build and CI validation must preserve this exact structure to guarantee 100% layout parity with factory OEM images.
+3. **Epistemological Boundary:** This analysis demonstrates that the factory platform uses the DT table structure; it does not independently prove whether the LittleKernel binary would reject an alternative representation (such as concatenated raw FDTs). Preserving the verified factory format represents the most conservative, predictable, and fail-safe engineering decision.
 
 ---
 
