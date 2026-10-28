@@ -132,7 +132,19 @@ jobs:
           python3 tools/validate_boot_v2.py ./twrp_raw.img --truncate --max-partition-size 33554432 > boot_v2_validation_report.txt
           cat boot_v2_validation_report.txt
 
-          # Inject AVB hash footer
+          # 1. Compute and record SHA-256 of raw validated payload (prior to AVB footer)
+          sha256sum ./twrp_raw.img > sha256_raw_payload.txt
+          echo "=== SHA-256 Raw Payload Digest ==="
+          cat sha256_raw_payload.txt
+
+          # 2. Extract public key and calculate its SHA-256 digest
+          mkdir -p /tmp/verify_twrp
+          "${avbtool_cmd[@]}" extract_public_key --key "$AVB_KEY" --output /tmp/verify_twrp/avb_key.pub
+          sha256sum /tmp/verify_twrp/avb_key.pub > avb_public_key_sha256.txt
+          echo "=== AVB Public Key SHA-256 ==="
+          cat avb_public_key_sha256.txt
+
+          # 3. Inject AVB hash footer
           "${avbtool_cmd[@]}" add_hash_footer \
             --image ./twrp_raw.img \
             --partition_size 33554432 \
@@ -140,7 +152,7 @@ jobs:
             --algorithm SHA256_RSA2048 \
             --key "$AVB_KEY"
 
-          # Verify partition size
+          # 4. Verify partition size
           ACTUAL_SIZE=$(stat -c%s ./twrp_raw.img)
           echo "Generated image size: $ACTUAL_SIZE bytes"
           if [ "$ACTUAL_SIZE" -ne 33554432 ]; then
@@ -148,7 +160,7 @@ jobs:
             exit 1
           fi
 
-          # Structural metadata inspection
+          # 5. Structural metadata inspection
           "${avbtool_cmd[@]}" info_image --image ./twrp_raw.img > avb_verification_report.txt
           echo "=== AVB Structural Metadata Report ==="
           cat avb_verification_report.txt
@@ -157,10 +169,9 @@ jobs:
           grep -q "Partition Name:.*recovery" avb_verification_report.txt || { echo "ERROR: Partition name is not recovery"; exit 1; }
           grep -q "Algorithm:.*SHA256_RSA2048" avb_verification_report.txt || { echo "ERROR: Algorithm is not SHA256_RSA2048"; exit 1; }
 
-          # Cryptographic signature and hash descriptor verification
-          mkdir -p /tmp/verify_twrp
+          # 6. Cryptographic signature and hash descriptor verification against extracted public key
           cp ./twrp_raw.img /tmp/verify_twrp/recovery.img
-          "${avbtool_cmd[@]}" verify_image --image /tmp/verify_twrp/recovery.img > avb_crypto_verification.txt
+          "${avbtool_cmd[@]}" verify_image --image /tmp/verify_twrp/recovery.img --key /tmp/verify_twrp/avb_key.pub > avb_crypto_verification.txt
           echo "=== AVB Cryptographic Verification Report ==="
           cat avb_crypto_verification.txt
 
@@ -173,9 +184,9 @@ jobs:
             exit 1
           }
 
-          # Calculate SHA-256
+          # 7. Calculate SHA-256 of final signed 32 MiB image
           sha256sum ./twrp_raw.img > sha256_recovery.txt
-          echo "=== SHA-256 Digest ==="
+          echo "=== SHA-256 Final Signed Recovery Digest ==="
           cat sha256_recovery.txt
 
           mv ./twrp_raw.img ./${TARGET_FILE}
@@ -188,6 +199,8 @@ jobs:
           path: |
             ./${{ env.TARGET_FILE }}
             boot_v2_validation_report.txt
+            sha256_raw_payload.txt
+            avb_public_key_sha256.txt
             avb_verification_report.txt
             avb_crypto_verification.txt
             sha256_recovery.txt
