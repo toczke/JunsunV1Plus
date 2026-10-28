@@ -40,18 +40,43 @@ static void sig_handler(int sig) {
 /*
  * Android-native process execution with fixed arguments (NO SHELL / NO INJECTION).
  * Avoids /bin/sh or /system/bin/sh entirely, preventing command injection vulnerabilities.
+ * Implements synchronous execution with waitpid EINTR loop, avoiding zombie processes.
  */
-static void spawn_cmd(const char* file, char* const argv[]) {
-    if (!file || !argv) return;
+static int run_cmd_sync(const char* file, char* const argv[]) {
+    if (!file || !argv) return -1;
     pid_t pid = fork();
+    if (pid < 0) {
+        perror("[ts_mcu_daemon] fork failed");
+        return -1;
+    }
     if (pid == 0) {
         // Child process: execute binary directly with explicit arguments
         execv(file, argv);
         _exit(127);
-    } else if (pid > 0) {
-        int status;
-        waitpid(pid, &status, WNOHANG);
     }
+
+    int status = 0;
+    pid_t w;
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+
+    if (w == -1) {
+        perror("[ts_mcu_daemon] waitpid failed");
+        return -1;
+    }
+
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        if (exit_code != 0) {
+            fprintf(stderr, "[ts_mcu_daemon] Command %s returned exit code %d\n", file, exit_code);
+        }
+        return exit_code;
+    } else if (WIFSIGNALED(status)) {
+        fprintf(stderr, "[ts_mcu_daemon] Command %s terminated by signal %d\n", file, WTERMSIG(status));
+        return -1;
+    }
+    return 0;
 }
 
 static void send_backcar_broadcast(int reverse_engaged) {
@@ -65,7 +90,7 @@ static void send_backcar_broadcast(int reverse_engaged) {
         (char*)(reverse_engaged ? "true" : "false"),
         NULL
     };
-    spawn_cmd("/system/bin/am", argv);
+    run_cmd_sync("/system/bin/am", argv);
 }
 
 static void send_illum_state(int illum_on) {
@@ -76,7 +101,7 @@ static void send_illum_state(int illum_on) {
         (char*)(illum_on ? "yes" : "no"),
         NULL
     };
-    spawn_cmd("/system/bin/cmd", uimode_argv);
+    run_cmd_sync("/system/bin/cmd", uimode_argv);
 
     char* const illum_argv[] = {
         (char*)"/system/bin/am",
@@ -88,7 +113,7 @@ static void send_illum_state(int illum_on) {
         (char*)(illum_on ? "true" : "false"),
         NULL
     };
-    spawn_cmd("/system/bin/am", illum_argv);
+    run_cmd_sync("/system/bin/am", illum_argv);
 }
 
 // -----------------------------------------------------------------------------
@@ -397,6 +422,7 @@ int main(int argc, char** argv) {
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
+    signal(SIGCHLD, SIG_IGN); // Prevent zombie process creation
 
     printf("=====================================================\n");
     printf(" Topway TS8667 Automotive MCU Daemon v2.0 (Hardened) \n");

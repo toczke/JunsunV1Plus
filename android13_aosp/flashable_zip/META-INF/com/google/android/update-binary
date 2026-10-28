@@ -7,7 +7,8 @@
 OUTFD=$2
 ZIPFILE=$3
 
-MIN_REQUIRED_BYTES=1932656640 # Exact uncompressed size of AOSP 13 GSI system.img
+MIN_REQUIRED_BYTES=1932644352 # Exact uncompressed byte size of AOSP 13 GSI system.img
+EXPECTED_SHA256="78076a0e5154b2198db65a5a57f73cde201622441daa7678f5e53d80aae8938b"
 
 ui_print() {
     if [ -n "$OUTFD" ]; then
@@ -66,78 +67,104 @@ ui_print "[✓] Hardware platform verified: MediaTek TS8667 compatible."
 set_progress 0.10
 
 # ------------------------------------------------------------------------------
-# GATE 2: Locate and Map Dynamic Logical System Partition & Active Slot
+# GATE 2: Multi-Factor Partition Topology & Target Device Verification
 # ------------------------------------------------------------------------------
-ui_print "- Locating target logical system block device & slot status..."
+ui_print "- Analyzing physical partition topology and dynamic mapper..."
 umount /system 2>/dev/null || true
 umount /system_root 2>/dev/null || true
 umount /tmp/sys_mnt 2>/dev/null || true
 
-SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null || true)
-if [ -n "$SLOT" ]; then
-    ui_print "  Active Slot: $SLOT (A/B layout detected)"
-else
-    ui_print "  Active Slot: None (Standard A-only Dynamic Partitions)"
-fi
-
-SYS_BLOCK=""
-CANDIDATES=""
-if [ -n "$SLOT" ]; then
-    CANDIDATES="/dev/block/mapper/system${SLOT} /dev/block/by-name/system${SLOT}"
-fi
-CANDIDATES="$CANDIDATES /dev/block/mapper/system /dev/block/by-name/system /dev/block/platform/bootdevice/by-name/system"
-
-for dev in $CANDIDATES; do
-    if [ -b "$dev" ]; then
-        SYS_BLOCK="$dev"
+# 1. Verify presence of physical super partition container
+SUPER_DEV=""
+for sdev in /dev/block/by-name/super /dev/block/platform/bootdevice/by-name/super /dev/block/platform/*/by-name/super; do
+    if [ -b "$sdev" ]; then
+        SUPER_DEV="$sdev"
         break
     fi
 done
 
-if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
-    ui_print "! Activating TWRP logical partition mapping for super..."
-    blockdev --setrw /dev/block/by-name/super 2>/dev/null || true
-    if [ -b /dev/block/mapper/system ]; then
-        SYS_BLOCK="/dev/block/mapper/system"
-    fi
-fi
-
-if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
-    ui_print "[-] ERROR: Cannot locate logical system block device!"
-    ui_print "    Ensure Dynamic Partitions (super) are mapped in TWRP."
-    ui_print "    Refusing to write to ambiguous block devices."
+if [ -z "$SUPER_DEV" ]; then
+    ui_print "[-] ERROR: Physical 'super' container partition not found!"
+    ui_print "    Target device does not appear to use Android Dynamic Partitions."
+    ui_print "    Aborting without modifying physical storage."
     exit 1
 fi
+ui_print "[✓] Found dynamic partition container: $SUPER_DEV"
 
-ui_print "[✓] Target system block device verified: $SYS_BLOCK"
+# 2. Check slot status from bootloader properties & partition names
+SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null || true)
+HAS_SLOT_A=0
+[ -b /dev/block/by-name/system_a ] && HAS_SLOT_A=1
+[ -b /dev/block/mapper/system_a ] && HAS_SLOT_A=1
+
+if [ -n "$SLOT" ] || [ "$HAS_SLOT_A" -eq 1 ]; then
+    [ -z "$SLOT" ] && SLOT="_a"
+    ui_print "  Topology: Slot-based A/B Dynamic Partitions (Slot: $SLOT)"
+    SYS_BLOCK="/dev/block/mapper/system${SLOT}"
+else
+    ui_print "  Topology: Single-slot A-only Dynamic Partitions"
+    SYS_BLOCK="/dev/block/mapper/system"
+fi
+
+# 3. Ensure mapper is actively populated by TWRP device-mapper
+if [ ! -b "$SYS_BLOCK" ]; then
+    ui_print "! Activating TWRP logical partition mapping on $SUPER_DEV..."
+    blockdev --setrw "$SUPER_DEV" 2>/dev/null || true
+fi
+
+if [ ! -b "$SYS_BLOCK" ]; then
+    ui_print "[-] ERROR: Logical system volume $SYS_BLOCK does not exist in device-mapper!"
+    ui_print "    Ambiguous partition layout. Refusing to write to unverified target."
+    exit 1
+fi
+ui_print "[✓] Verified unambiguous target block device: $SYS_BLOCK"
 
 # ------------------------------------------------------------------------------
-# GATE 3: Pre-Flash Image Integrity & Partition Capacity Check
+# GATE 3: Pre-Flash Image Integrity, Format & Cryptographic Authentication
 # ------------------------------------------------------------------------------
-ui_print "- Testing payload archive integrity (CRC32)..."
+# 1. Archive CRC32 verification
+ui_print "- Testing ZIP archive integrity (CRC32)..."
 if ! unzip -t "$ZIPFILE" system.img >/dev/null 2>&1; then
-    ui_print "[-] ERROR: system.img archive verification failed! Archive corrupted."
+    ui_print "[-] ERROR: system.img archive verification failed! ZIP archive corrupted."
+    exit 1
+fi
+ui_print "[✓] Archive integrity verified (CRC32 valid)."
+
+# 2. Cryptographic SHA-256 verification against approved artifact manifest
+ui_print "- Cryptographically verifying system.img SHA-256 hash..."
+ACTUAL_SHA256=$(unzip -p "$ZIPFILE" system.img | sha256sum | awk '{print $1}')
+ui_print "  Computed SHA-256: $ACTUAL_SHA256"
+ui_print "  Approved SHA-256: $EXPECTED_SHA256"
+
+if [ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]; then
+    ui_print "[-] ERROR: Cryptographic SHA-256 MISMATCH! Image unverified or tampered."
     ui_print "    Aborting before modifying physical eMMC storage."
     exit 1
 fi
-ui_print "[✓] Payload integrity verified (CRC32 valid)."
+ui_print "[✓] Cryptographic SHA-256 identity authentication PASSED."
 
+# 3. Capacity verification of the exact target block device
 PART_SIZE=$(blockdev --getsize64 "$SYS_BLOCK" 2>/dev/null || echo 0)
-ui_print "  Allocated partition size: $PART_SIZE bytes (Required: $MIN_REQUIRED_BYTES bytes)"
+ui_print "  Target blockdev size: $PART_SIZE bytes (Required: $MIN_REQUIRED_BYTES bytes)"
 
 if [ "$PART_SIZE" -lt "$MIN_REQUIRED_BYTES" ]; then
     ui_print "[-] ERROR: System partition is too small ($PART_SIZE < $MIN_REQUIRED_BYTES)!"
-    ui_print "    The Android 13 system image cannot fit into the current volume."
     ui_print "    Aborting before modifying physical eMMC storage."
     exit 1
 fi
 ui_print "[✓] Partition capacity check PASSED."
-set_progress 0.20
+set_progress 0.25
 
 # ------------------------------------------------------------------------------
-# STEP 4: Stream System Image to Block Device
+# STEP 4: Stream System Image to Block Device with Re-verification
 # ------------------------------------------------------------------------------
-ui_print "- Streaming Android 13 system image to flash..."
+# Final sanity check: confirm device node is still active immediately prior to write
+if [ ! -b "$SYS_BLOCK" ]; then
+    ui_print "[-] FATAL: Target device $SYS_BLOCK disappeared immediately prior to write!"
+    exit 1
+fi
+
+ui_print "- Streaming Android 13 system image to $SYS_BLOCK..."
 ui_print "  Please wait, this will take approximately 60-90 seconds..."
 
 # Use dd with sync to flush write buffer
@@ -149,7 +176,7 @@ if ! unzip -p "$ZIPFILE" system.img | dd of="$SYS_BLOCK" bs=4M conv=fsync 2>/dev
 fi
 sync
 
-ui_print "[✓] System image flashed successfully."
+ui_print "[✓] System image flashed and synced to disk."
 set_progress 0.70
 
 # ------------------------------------------------------------------------------
