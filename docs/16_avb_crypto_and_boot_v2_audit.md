@@ -127,14 +127,14 @@ recovery: Successfully verified sha256 hash of /tmp/verify_twrp/recovery.img for
 It is crucial to distinguish between two completely separate verification realms:
 1. **CI Pipeline Mathematical Verification:** Signing with the standard AOSP test key (`external/avb/test/data/testkey_rsa2048.pem`) in CI validates the formatting toolchain, footer geometry, vbmeta offsets, and cryptographic hash descriptor math. It proves that the image is mathematically consistent with `avbtool`.
 2. **Hardware Bootloader Trust Boundary:** The LittleKernel (LK) bootloader embedded in the MediaTek MT8667 ROM does **NOT** trust this AOSP test key. MediaTek LK relies on OEM public keys burned into efuses or embedded in the OEM LittleKernel binary.
-   - **Unverified Hypothesis Regarding LK in Orange State:** While the TS8667 head unit reports `[ro.boot.verifiedbootstate]: [orange]` and `[ro.boot.flash.locked]: [0]`, these properties alone do not prove that the specific vendor LittleKernel binary on the TS8667 will accept this recovery image. LittleKernel implementations vary significantly across MediaTek ODMs (Topway), and the verification path for `recovery` may enforce vendor-specific signature or header checks that differ from `boot`. The observation that Magisk boots on this platform does not constitute proof that a custom recovery image will be accepted.
+   - **Unverified Hypothesis Regarding LK in Orange State:** While the TS8667 head unit reports `[ro.boot.verifiedbootstate]: [orange]` and `[ro.boot.flash.locked]: [0]`, these properties alone do not prove that the specific vendor LittleKernel binary on the TS8667 will accept this recovery image. LittleKernel implementations vary significantly across MediaTek ODMs (Topway). Possible implementation-dependent mechanisms (such as secro/seccfg partitions or OEM signature checks) could be enforced on `recovery` independently of `boot`. The observation that Magisk boots on this platform does not constitute proof that a custom recovery image will be accepted.
    - **Crucial Warning:** Bootloader acceptance remains strictly an unverified hypothesis. Under no circumstances does a successful `avbtool verify_image` in CI constitute proof that the physical unit will boot the image without an established, verified unbrick recovery path.
 
 ### 3.4 Package Structure: The 8 Generated Artifacts
 The GitHub Actions workflow packages exactly 8 distinct files:
 1. `twrp_junsun_${RUN_NUMBER}.img`: Final signed 32 MiB recovery image.
-2. `boot_v2_validation_report.txt`: Output of `tools/validate_boot_v2.py` verifying Header v2, DTBO, and DTB structures.
-3. `sha256_raw_payload.txt`: SHA-256 checksum of the validated raw payload before AVB footer injection.
+2. `boot_v2_validation_report.txt`: Output of `tools/validate_boot_v2.py` verifying Header v2, DTBO, and DTB structures, including `total_payload` bytes.
+3. `sha256_raw_payload.txt`: SHA-256 checksum of the validated raw payload before AVB footer injection. For reproducible independent verification from the final signed image, extracting the exact byte slice `head -c ${total_payload} twrp_junsun_${RUN_NUMBER}.img | sha256sum` must bit-identically match this file and the `Digest:` in `avb_verification_report.txt`.
 4. `avb_key_pub_pem_sha256.txt`: SHA-256 checksum of the extracted PEM-encoded public key.
 5. `avb_key_bin_sha256.txt`: SHA-256 checksum of the extracted binary AVB format public key.
 6. `avb_verification_report.txt`: Output of `avbtool info_image` detailing footer version and descriptor offsets.
