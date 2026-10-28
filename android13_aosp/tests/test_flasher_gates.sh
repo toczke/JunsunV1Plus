@@ -192,14 +192,13 @@ run_production_flasher() {
         export MOCK_SLOT="$slot"
         export MOCK_PART_SIZE="$part_size"
         export MOCK_WRITE_LOG="$MOCK_WRITE_LOG"
-        sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
-            -e "s|/dev/block/mapper/system_a|$MOCK_BLOCK/mapper/system_a|g" \
-            -e "s|/dev/block/mapper/system_b|$MOCK_BLOCK/mapper/system_b|g" \
-            -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
-            -e "s|/dev/block/by-name/system_a|$MOCK_BLOCK/by-name/system_a|g" \
-            -e "s|/dev/block/by-name/system_b|$MOCK_BLOCK/by-name/system_b|g" \
-            -e "s|/dev/block/by-name/system|$MOCK_BLOCK/by-name/system|g" \
+        # Globally replace physical /dev/block with sandboxed mock path
+        sed -e "s|/dev/block|$MOCK_BLOCK|g" \
             "$SCRIPT_UNDER_TEST" > "$TEST_DIR/runner.sh"
+        if grep -v "$TEST_DIR" "$TEST_DIR/runner.sh" | grep -q "/dev/block"; then
+            echo "FATAL: Unsubstituted physical /dev/block found in runner.sh!" >&2
+            exit 99
+        fi
         chmod +x "$TEST_DIR/runner.sh"
         sed -i 's|-b |-e |g' "$TEST_DIR/runner.sh"
         sh "$TEST_DIR/runner.sh" 3 1 "$zip_file" >/dev/null 2>&1
@@ -342,8 +341,7 @@ mktemp_fail_ret=$(
     touch "$MOCK_BLOCK/by-name/super" "$MOCK_BLOCK/mapper/system"
 
     # Replace mktemp with false to simulate creation failure
-    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
-        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+    sed -e "s|/dev/block|$MOCK_BLOCK|g" \
         -e "s|mktemp -d [^)]*|false|g" \
         "$SCRIPT_UNDER_TEST" > "$TEST_DIR/mktemp_fail_runner.sh"
     sed -i 's|-b |-e |g' "$TEST_DIR/mktemp_fail_runner.sh"
@@ -385,8 +383,7 @@ fifo_fail_ret=$(
     touch "$MOCK_BLOCK/by-name/super" "$MOCK_BLOCK/mapper/system"
 
     # Replace mkfifo with false to simulate creation failure
-    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
-        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+    sed -e "s|/dev/block|$MOCK_BLOCK|g" \
         -e "s|mkfifo|false|g" \
         "$SCRIPT_UNDER_TEST" > "$TEST_DIR/fifo_fail_runner.sh"
     sed -i 's|-b |-e |g' "$TEST_DIR/fifo_fail_runner.sh"
@@ -423,8 +420,7 @@ sig_cleanup_ret=$(
     mkdir -p "$MOCK_BLOCK/by-name" "$MOCK_BLOCK/mapper"
     touch "$MOCK_BLOCK/by-name/super" "$MOCK_BLOCK/mapper/system"
 
-    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
-        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+    sed -e "s|/dev/block|$MOCK_BLOCK|g" \
         -e "s|sha256sum < \"\$FIFO_PATH\"|sh -c 'cat < \"\$FIFO_PATH\" >/dev/null; while true; do sleep 0.1; done'|g" \
         "$SCRIPT_UNDER_TEST" > "$TEST_DIR/sig_runner.sh"
     sed -i 's|-b |-e |g' "$TEST_DIR/sig_runner.sh"
@@ -480,8 +476,7 @@ pos_ret=$(
     touch "$MOCK_BLOCK/mapper/system"
 
     # Replace EXPECTED_SHA256 with test payload hash and mock write target
-    sed -e "s|/dev/block/by-name/super|$MOCK_BLOCK/by-name/super|g" \
-        -e "s|/dev/block/mapper/system|$MOCK_BLOCK/mapper/system|g" \
+    sed -e "s|/dev/block|$MOCK_BLOCK|g" \
         -e "s|EXPECTED_SHA256=\".*\"|EXPECTED_SHA256=\"$VALID_SHA\"|g" \
         -e "s|conv=fsync||g" \
         "$SCRIPT_UNDER_TEST" > "$TEST_DIR/pos_runner.sh"

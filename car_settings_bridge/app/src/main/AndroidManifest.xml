@@ -53,6 +53,6 @@
 
     <permission
         android:name="com.topway.carsettingsbridge.permission.BIND_CAR_SETTINGS_SERVICE"
-        android:protectionLevel="signatureOrSystem" />
+        android:protectionLevel="signature|privileged" />
 
 </manifest>
