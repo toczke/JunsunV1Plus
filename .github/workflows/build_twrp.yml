@@ -63,7 +63,9 @@ jobs:
         run: |
           cd ~/twrp
           export ALLOW_MISSING_DEPENDENCIES=true
+          set +e
           source build/envsetup.sh
+          set -e
           lunch omni_ts8667-eng || lunch twrp_ts8667-eng
           mka recoveryimage -j$(nproc --all)
 
