@@ -12,9 +12,9 @@ Katalog zawiera przetestowane, zweryfikowane obrazy w formacie Android Boot v2 o
 
 ### 2. `twrp_fixed_32mb.img`
 - **Rozmiar:** 33,554,432 bajtów (32 MB)
-- **SHA-256:** `54227d9280104bccf780e967d5f0d53bc4fa22ecb7bd8e3f7844004a8d89f494`
-- **Opis:** Odchudzone TWRP z zachowanym fabrycznym kernelem, drzewem DTB i DTBO recovery.
-- **Przeznaczenie:** Wgranie na `/dev/block/by-name/recovery` lub `/dev/block/by-name/boot`.
+- **SHA-256:** `9ae9b1fe146fc1f348493e479be159034fdf912fba42aec054b4d7a7abb58c1f`
+- **Opis:** Odchudzone TWRP z zachowanym fabrycznym kernelem, drzewem DTB i DTBO recovery. Usunięto flagę `slotselect` (Non-A/B dynamic partitions mount fix) oraz dopasowano skalowanie interfejsu (1280x720).
+- **Przeznaczenie:** Wgranie WYŁĄCZNIE na partycję `/dev/block/by-name/recovery`. NIGDY nie wgrywaj obrazu TWRP na partycję `boot` (LittleKernel odrzuca nagłówek Recovery DTBO przy normalnym rozruchu i wchodzi w pętlę Fastboot).
 
 ### 3. `boot_stock.img`
 - **Rozmiar:** 33,554,432 bajtów (32 MB)

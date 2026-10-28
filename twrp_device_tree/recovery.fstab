@@ -1,9 +1,9 @@
 # Android fstab file for TWRP on Topway TS8667 / MT6768
 # <src>                                              <mnt_point> <type> <mnt_flags and options>                             <fs_mgr_flags>
 
-/system         ext4    /dev/block/mapper/system        flags=display="System";backup=1;logical;slotselect
-/vendor         ext4    /dev/block/mapper/vendor        flags=display="Vendor";backup=1;logical;slotselect
-/product        ext4    /dev/block/mapper/product       flags=display="Product";backup=1;logical;slotselect
+/system         ext4    /dev/block/mapper/system        flags=display="System";backup=1;logical
+/vendor         ext4    /dev/block/mapper/vendor        flags=display="Vendor";backup=1;logical
+/product        ext4    /dev/block/mapper/product       flags=display="Product";backup=1;logical
 
 /data           ext4    /dev/block/by-name/userdata     flags=display="Data";encryptable=userdata;fileencryption=aes-256-xts
 /cache          ext4    /dev/block/by-name/cache        flags=display="Cache"

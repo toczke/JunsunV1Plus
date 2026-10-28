@@ -74,6 +74,18 @@ public class MainActivity extends Activity {
         btnRebootSystem.setOnClickListener(v -> runRebootSystem());
     }
 
+    private void setButtonsEnabled(final boolean enabled) {
+        mainHandler.post(() -> {
+            btnAdbWifi.setEnabled(enabled);
+            btnFlashMagisk.setEnabled(enabled);
+            btnFlashTwrp.setEnabled(enabled);
+            btnRebootRecovery.setEnabled(enabled);
+            btnBackup.setEnabled(enabled);
+            btnRestoreStock.setEnabled(enabled);
+            btnRebootSystem.setEnabled(enabled);
+        });
+    }
+
     private void log(String msg) {
         mainHandler.post(() -> {
             String time = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
@@ -182,18 +194,16 @@ public class MainActivity extends Activity {
             return platformByName;
         }
 
-        for (int i = 1; i <= 45; i++) {
-            String p = "/dev/block/mmcblk0p" + i;
-            String link = executeRootCommand("ls -l /dev/block/by-name/ 2>/dev/null | grep -w " + partitionName + " || true").trim();
-            if (link.contains("mmcblk0p" + i)) {
-                return p;
-            }
+        String resolved = executeRootCommand("readlink -f /dev/block/by-name/" + partitionName + " 2>/dev/null").trim();
+        if (resolved.startsWith("/dev/block/")) {
+            return resolved;
         }
-        String out = executeRootCommand("find /dev/block -name " + partitionName + " 2>/dev/null | head -n 1").trim();
-        if (out.startsWith("/dev/block")) {
-            return out;
+
+        resolved = executeRootCommand("find /dev/block -name " + partitionName + " 2>/dev/null | head -n 1").trim();
+        if (resolved.startsWith("/dev/block/")) {
+            return resolved;
         }
-        return "/dev/block/by-name/" + partitionName;
+        return byName;
     }
 
     private String findFile(String... names) {
@@ -264,18 +274,20 @@ public class MainActivity extends Activity {
             }
 
             DataOutputStream os = new DataOutputStream(process.getOutputStream());
-            long blocks = byteCount / 65536;
+            long blocks = (byteCount + 65535) / 65536;
             os.writeBytes("dd if=" + blockDev + " bs=65536 count=" + blocks + " 2>/dev/null\n");
             os.writeBytes("exit\n");
             os.flush();
 
             InputStream is = process.getInputStream();
             byte[] buffer = new byte[65536];
-            int n;
-            long total = 0;
-            while ((n = is.read(buffer)) != -1) {
+            long bytesRemaining = byteCount;
+            while (bytesRemaining > 0) {
+                int toRead = (int) Math.min(buffer.length, bytesRemaining);
+                int n = is.read(buffer, 0, toRead);
+                if (n == -1) break;
                 digest.update(buffer, 0, n);
-                total += n;
+                bytesRemaining -= n;
             }
             process.waitFor();
 
@@ -297,60 +309,86 @@ public class MainActivity extends Activity {
      */
     private void runFlashMagiskRoot() {
         new Thread(() -> {
-            log(">>> [1/5] Initiating Magisk Root installation (boot.img)...");
-            String magiskImg = findFile("boot_magisk_patched.img", "magisk_boot.img");
-            if (magiskImg == null) {
-                log("[ERROR] boot_magisk_patched.img not found on external storage!");
-                return;
-            }
+            setButtonsEnabled(false);
+            try {
+                log(">>> [1/5] Initiating Magisk Root installation (boot.img)...");
+                String magiskImg = findFile("boot_magisk_patched.img", "magisk_boot.img");
+                if (magiskImg == null) {
+                    log("[ERROR] boot_magisk_patched.img not found on external storage!");
+                    return;
+                }
 
-            File srcFile = new File(magiskImg);
-            long fileSize = srcFile.length();
-            String bootDev = findBlockDevice("boot");
-            String miscDev = findBlockDevice("misc");
+                File srcFile = new File(magiskImg);
+                long fileSize = srcFile.length();
+                String bootDev = findBlockDevice("boot");
+                String miscDev = findBlockDevice("misc");
 
-            log("Source: " + magiskImg + " (" + fileSize + " bytes)");
-            log("Target Partition: " + bootDev);
+                log("Source: " + magiskImg + " (" + fileSize + " bytes)");
+                log("Target Partition: " + bootDev + " (BOOT ONLY)");
 
-            // 1. Compute source checksum
-            log(">>> [2/5] Computing source SHA-256 checksum...");
-            String srcHash = computeFileSha256(magiskImg, fileSize);
-            log("Source SHA-256: " + srcHash);
+                // 1. Compute source checksum
+                log(">>> [2/5] Computing source SHA-256 checksum...");
+                String srcHash = computeFileSha256(magiskImg, fileSize);
+                log("Source SHA-256: " + srcHash);
 
-            // 2. Backup current boot
-            log(">>> [3/5] Backing up current boot partition...");
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            String backupPath = "/sdcard/RecoveryBackup/boot_backup_" + timeStamp + ".img";
-            executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + bootDev + " of=" + backupPath + " bs=4M");
-
-            // 3. Write boot partition
-            log(">>> [4/5] Writing Magisk boot image to " + bootDev + "...");
-            executeRootCommand("dd if=\"" + magiskImg + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
-            executeRootCommand("sync");
-
-            // Clear misc to prevent any boot loop
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
-            executeRootCommand("sync");
-
-            // 4. Verify post-flash integrity
-            log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
-            String partHash = computePartitionSha256(bootDev, fileSize);
-            log("eMMC Partition SHA-256: " + partHash);
-
-            if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
-                log("==================================================");
-                log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
-                log("Magisk boot image written and verified on eMMC flash.");
-                log("Reboot device via 'Reboot System' to enter rooted Android.");
-                log("==================================================");
-            } else {
-                log("==================================================");
-                log("[CRITICAL ERROR] SHA-256 mismatch detected!");
-                log("Restoring backup immediately to prevent brick...");
-                executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+                // 2. Backup current boot
+                log(">>> [3/5] Backing up current boot partition...");
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                String backupPath = "/sdcard/RecoveryBackup/boot_backup_" + timeStamp + ".img";
+                executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + bootDev + " of=" + backupPath + " bs=4M conv=fsync");
                 executeRootCommand("sync");
-                log("Safety backup restored. Boot partition is safe.");
-                log("==================================================");
+
+                String chk = executeRootCommand("[ -s " + backupPath + " ] && stat -c%s " + backupPath + " 2>/dev/null || echo 0").trim();
+                long backupSize = 0;
+                try { backupSize = Long.parseLong(chk); } catch (Exception ignored) {}
+                if (backupSize < 30000000) {
+                    log("[CRITICAL ERROR] Pre-flash boot backup verification failed (size=" + backupSize + " bytes)!");
+                    log("Aborting flash immediately to protect device integrity.");
+                    return;
+                }
+                log("Pre-flash boot backup verified (" + backupSize + " bytes).");
+
+                // Also copy backup to USB storage alongside source image if possible
+                try {
+                    File parent = srcFile.getParentFile();
+                    if (parent != null && parent.isDirectory()) {
+                        String usbBackupDir = parent.getAbsolutePath() + "/RecoveryBackup";
+                        executeRootCommand("mkdir -p " + usbBackupDir + " && cp " + backupPath + " " + usbBackupDir + "/ && sync");
+                        log("Safety backup mirrored to USB: " + usbBackupDir);
+                    }
+                } catch (Exception ignored) {}
+
+                // 3. Write boot partition
+                log(">>> [4/5] Writing Magisk boot image to " + bootDev + "...");
+                executeRootCommand("dd if=\"" + magiskImg + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+                executeRootCommand("sync");
+
+                // Clear misc to prevent any boot loop
+                executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+                executeRootCommand("sync");
+
+                // 4. Verify post-flash integrity
+                log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
+                String partHash = computePartitionSha256(bootDev, fileSize);
+                log("eMMC Partition SHA-256: " + partHash);
+
+                if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
+                    log("==================================================");
+                    log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
+                    log("Magisk boot image written and verified on eMMC flash.");
+                    log("Reboot device via 'Reboot System' to enter rooted Android.");
+                    log("==================================================");
+                } else {
+                    log("==================================================");
+                    log("[CRITICAL ERROR] SHA-256 mismatch detected!");
+                    log("Restoring backup immediately to prevent brick...");
+                    executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+                    executeRootCommand("sync");
+                    log("Safety backup restored. Boot partition is safe.");
+                    log("==================================================");
+                }
+            } finally {
+                setButtonsEnabled(true);
             }
         }).start();
     }
@@ -361,55 +399,81 @@ public class MainActivity extends Activity {
      */
     private void runFlashTwrpRecovery() {
         new Thread(() -> {
-            log(">>> [1/5] Initiating TWRP Recovery installation (recovery.img)...");
-            String twrpImg = findFile("twrp_fixed_32mb.img", "twrp.img");
-            if (twrpImg == null) {
-                log("[ERROR] twrp_fixed_32mb.img or twrp.img not found!");
-                return;
-            }
+            setButtonsEnabled(false);
+            try {
+                log(">>> [1/5] Initiating TWRP Recovery installation (recovery.img)...");
+                String twrpImg = findFile("twrp_fixed_32mb.img", "twrp.img");
+                if (twrpImg == null) {
+                    log("[ERROR] twrp_fixed_32mb.img or twrp.img not found!");
+                    return;
+                }
 
-            File srcFile = new File(twrpImg);
-            long fileSize = srcFile.length();
-            String recDev = findBlockDevice("recovery");
+                File srcFile = new File(twrpImg);
+                long fileSize = srcFile.length();
+                String recDev = findBlockDevice("recovery");
 
-            log("Source: " + twrpImg + " (" + fileSize + " bytes)");
-            log("Target Partition: " + recDev + " (RECOVERY ONLY)");
+                log("Source: " + twrpImg + " (" + fileSize + " bytes)");
+                log("Target Partition: " + recDev + " (RECOVERY ONLY)");
 
-            // 1. Source checksum
-            log(">>> [2/5] Computing source SHA-256 checksum...");
-            String srcHash = computeFileSha256(twrpImg, fileSize);
-            log("Source SHA-256: " + srcHash);
+                // 1. Source checksum
+                log(">>> [2/5] Computing source SHA-256 checksum...");
+                String srcHash = computeFileSha256(twrpImg, fileSize);
+                log("Source SHA-256: " + srcHash);
 
-            // 2. Backup recovery
-            log(">>> [3/5] Backing up current recovery partition...");
-            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            String backupPath = "/sdcard/RecoveryBackup/recovery_backup_" + timeStamp + ".img";
-            executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + recDev + " of=" + backupPath + " bs=4M");
-
-            // 3. Write recovery partition
-            log(">>> [4/5] Writing TWRP image to " + recDev + "...");
-            executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
-            executeRootCommand("sync");
-
-            // 4. Verify post-flash integrity
-            log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
-            String partHash = computePartitionSha256(recDev, fileSize);
-            log("eMMC Partition SHA-256: " + partHash);
-
-            if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
-                log("==================================================");
-                log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
-                log("TWRP successfully written to recovery partition.");
-                log("Click 'Reboot Recovery (ffup)' to boot into TWRP.");
-                log("==================================================");
-            } else {
-                log("==================================================");
-                log("[CRITICAL ERROR] SHA-256 mismatch detected!");
-                log("Restoring backup immediately...");
-                executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+                // 2. Backup recovery
+                log(">>> [3/5] Backing up current recovery partition...");
+                String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                String backupPath = "/sdcard/RecoveryBackup/recovery_backup_" + timeStamp + ".img";
+                executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + recDev + " of=" + backupPath + " bs=4M conv=fsync");
                 executeRootCommand("sync");
-                log("Safety backup restored. Recovery partition is safe.");
-                log("==================================================");
+
+                String chk = executeRootCommand("[ -s " + backupPath + " ] && stat -c%s " + backupPath + " 2>/dev/null || echo 0").trim();
+                long backupSize = 0;
+                try { backupSize = Long.parseLong(chk); } catch (Exception ignored) {}
+                if (backupSize < 30000000) {
+                    log("[CRITICAL ERROR] Pre-flash recovery backup verification failed (size=" + backupSize + " bytes)!");
+                    log("Aborting flash immediately to protect device integrity.");
+                    return;
+                }
+                log("Pre-flash recovery backup verified (" + backupSize + " bytes).");
+
+                // Also copy backup to USB storage alongside source image if possible
+                try {
+                    File parent = srcFile.getParentFile();
+                    if (parent != null && parent.isDirectory()) {
+                        String usbBackupDir = parent.getAbsolutePath() + "/RecoveryBackup";
+                        executeRootCommand("mkdir -p " + usbBackupDir + " && cp " + backupPath + " " + usbBackupDir + "/ && sync");
+                        log("Safety backup mirrored to USB: " + usbBackupDir);
+                    }
+                } catch (Exception ignored) {}
+
+                // 3. Write recovery partition
+                log(">>> [4/5] Writing TWRP image to " + recDev + "...");
+                executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+                executeRootCommand("sync");
+
+                // 4. Verify post-flash integrity
+                log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
+                String partHash = computePartitionSha256(recDev, fileSize);
+                log("eMMC Partition SHA-256: " + partHash);
+
+                if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
+                    log("==================================================");
+                    log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
+                    log("TWRP successfully written to recovery partition.");
+                    log("Click 'Reboot Recovery (ffup)' to boot into TWRP.");
+                    log("==================================================");
+                } else {
+                    log("==================================================");
+                    log("[CRITICAL ERROR] SHA-256 mismatch detected!");
+                    log("Restoring backup immediately...");
+                    executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+                    executeRootCommand("sync");
+                    log("Safety backup restored. Recovery partition is safe.");
+                    log("==================================================");
+                }
+            } finally {
+                setButtonsEnabled(true);
             }
         }).start();
     }
