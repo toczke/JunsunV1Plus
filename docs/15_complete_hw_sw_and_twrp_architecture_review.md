@@ -384,10 +384,10 @@ If the unit fails to display an image or gets stuck due to improper external mod
 | File Path | Byte Size | SHA-256 Checksum | Verification Status |
 | :--- | :--- | :--- | :--- |
 | `output_images/boot_magisk_patched.img` | 33,554,432 | `3a8a1d1d14db01d92c71f6a61c075624a0fa96907dd9eb9b83cc1241cf7906b3` | **PASS (Verified)** |
-| `output_images/twrp_fixed_32mb.img` | 33,554,432 | `28defe374ba9f73260666f0fe9474d9bc07e96b9dea3f95a0cba3faa40d7dd40` | **PASS (Verified)** |
+| `output_images/twrp_fixed_32mb.img` | 33,554,432 | `bbc01803ae160e3aa05d02d9ec1ad1735a2ebcd21a7197f936f2c3d81c6ac70e` | **PASS (Verified with AVB Footer)** |
 | `output_images/boot_stock.img` | 33,554,432 | `9c7f01d94ae090ccd03ccad36caaf95f6b14de79e58529669e0b80ee74c35ac4` | **PASS (Verified)** |
 | `output_images/recovery_stock.img` | 33,554,432 | `7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f` | **PASS (Verified)** |
-| `prebuilt_apks/TS8667_TWRP_Flasher_APK/app-debug.apk` | 24,842 | `0015502c3fe5a1c31278ff5d7fa44b361d761619967664fbaaaec61e3d7a8d5c` | **PASS (Verified)** |
+| `prebuilt_apks/TS8667_TWRP_Flasher_APK/app-debug.apk` | 24,902 | `f05f7200064dc70e8b5f2457b20e20c53e492746c18f17fc1b9e13a0ccbc57bb` | **PASS (Verified with Exact 32MB Check)** |
 
 ---
 

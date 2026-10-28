@@ -9,6 +9,8 @@ vendor/
 # Large binary partition dumps & diagnostic packages
 diag_pack.tar.gz
 extracted_diagnostics/
+evidence_bundle/
+*.tar.gz
 output_images/*.img
 !output_images/README.md
 
