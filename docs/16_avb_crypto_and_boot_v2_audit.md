@@ -226,10 +226,15 @@ PASS: output_images/twrp_fixed_32mb.img
 
 ---
 
-## 6. Mandatory Physical Hardware Verification Protocol
+## 6. Mandatory Physical Hardware Verification & Emergency Unbrick Protocol
 
-Before any flashing is approved for end users, the recovery image must pass the following six-step validation protocol on physical hardware with an established unbrick path (SP Flash Tool / LittleKernel UART console):
+### 6.1 Emergency Unbrick Procedure (MediaTek BROM / SP Flash Tool)
+Before performing any write operations to the physical eMMC storage of the TS8667 unit, an established, proven recovery path must be ready:
+1. **BootROM (BROM) Access:** Connect the unit via rear USB 4-pin/6-pin OTG cable to a host Linux PC running `spflash` or SP Flash Tool v5.21+.
+2. **Scatter File:** Use `firmware_dump/MT6768_Android_scatter.txt` (`spm8667p1_64`).
+3. **Partition Restoration:** In the event of LittleKernel boot failure or display corruption, flash `output_images/recovery_stock.img` directly to partition `recovery` (`linear_start_addr: 0x1d000000`, size `0x02000000` / 32 MiB) in BROM mode (holding the reset/ground pin or issuing `reboot bootloader` / `fastboot flash recovery`).
 
+### 6.2 Mandatory Hardware Acceptance Protocol
 1. **LittleKernel Acceptance:** Verify LK parses the image and does not trigger `boot error` or bootloader panic.
 2. **Display & Digitizer:** Confirm TWRP GUI renders at 1280x720 landscape and Goodix GT1151/GT9886 touch input registers accurately.
 3. **ADB Daemon:** Verify `adb shell` connects as root (`uid=0`) from recovery mode.
@@ -245,6 +250,4 @@ Before any flashing is approved for end users, the recovery image must pass the 
 | :--- | :--- | :--- | :--- | :--- |
 | [`40661162555`](https://github.com/toczke/JunsunV1Plus/actions/runs/40661162555) | `c777980` | Flasher APK Build | `app-debug.apk` (`f05f7200...`) | **SUCCESS** |
 | [`40668649073`](https://github.com/toczke/JunsunV1Plus/actions/runs/40668649073) | [`124b8e9`](https://github.com/toczke/JunsunV1Plus/commit/124b8e9c7c74e2634058718223eafed68e58f35d) | Hardened TWRP Build | Blocked: `ValueError: Expected v2, got version 0` | **BLOCKED BY VALIDATOR** |
-| [`40671670072`](https://github.com/toczke/JunsunV1Plus/actions/runs/40671670072) | [`7f65b97`](https://github.com/toczke/JunsunV1Plus/commit/7f65b973e08e37bff18bc9229f1f8c08dc11c4a2) | Standard 32-Byte DT Entry & Multi-Entry Table Validator | In progress in CI pipeline | **BUILDING** |
-| [`40672740702`](https://github.com/toczke/JunsunV1Plus/actions/runs/40672740702) | [`33a8ae8`](https://github.com/toczke/JunsunV1Plus/commit/33a8ae821361c4701e6e0689b9d365f5a8c9e057) | Canonical Validator Unification & Strict Table Fields | Unified `tools/validate_boot_v2.py` in CI | **BUILDING** |
-| [`40673062335`](https://github.com/toczke/JunsunV1Plus/actions/runs/40673062335) | [`d8b62af`](https://github.com/toczke/JunsunV1Plus/commit/d8b62af4836696dbf53bf7411bc2e8d9753c1537) | Explicit `BOARD_MKBOOTIMG_ARGS` with `--header_version 2`, `--dtb`, `--recovery_dtbo` | Full Boot Image v2 generation | **BUILDING** |
+| [`40674179381`](https://github.com/toczke/JunsunV1Plus/actions/runs/40674179381) | [`d727883`](https://github.com/toczke/JunsunV1Plus/commit/d727883fd9ba3715185acf7da1c423368e386e13) | BoardConfig.mk v2 + Unified Validator + Raw vs Signed SHA-256 + Key Verification | `twrp_junsun_*.img`, raw payload SHA-256, signed recovery SHA-256, public key SHA-256, verification reports | **BUILDING** |
