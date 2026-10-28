@@ -1,0 +1,10 @@
+# Topway TS8667 Automotive Bridge Service Initialization
+service ts_automotive /system/bin/ts_automotive_init.sh
+    class late_start
+    user root
+    group root system
+    seclabel u:r:init:s0
+    oneshot
+
+on property:sys.boot_completed=1
+    start ts_automotive

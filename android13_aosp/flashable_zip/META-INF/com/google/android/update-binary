@@ -1,0 +1,155 @@
+#!/sbin/sh
+# ==============================================================================
+# Topway TS8667 / Junsun V1 Plus - Android 13 AOSP Custom ROM Flasher
+# Standard TWRP Flashable ZIP update-binary
+# ==============================================================================
+
+OUTFD=$2
+ZIPFILE=$3
+
+ui_print() {
+    if [ -n "$OUTFD" ]; then
+        echo "ui_print $1" >&$OUTFD
+        echo "ui_print" >&$OUTFD
+    else
+        echo "$1"
+    fi
+}
+
+set_progress() {
+    if [ -n "$OUTFD" ]; then
+        echo "set_progress $1" >&$OUTFD
+    fi
+}
+
+ui_print "====================================================="
+ui_print " Topway TS8667 / Junsun V1 Plus (Helio P65 MT6768)  "
+ui_print "       Android 13.0 AOSP Custom ROM Flasher         "
+ui_print "====================================================="
+
+set_progress 0.05
+
+# 1. Unmount existing system partitions if mounted
+umount /system 2>/dev/null || true
+umount /system_root 2>/dev/null || true
+umount /tmp/sys_mnt 2>/dev/null || true
+
+# 2. Locate target logical block device for system
+ui_print "- Searching for logical system block device..."
+SYS_BLOCK=""
+for dev in \
+    /dev/block/mapper/system \
+    /dev/block/by-name/system \
+    /dev/block/platform/bootdevice/by-name/system \
+    /dev/block/platform/*/by-name/system; do
+    if [ -b "$dev" ]; then
+        SYS_BLOCK="$dev"
+        break
+    fi
+done
+
+if [ -z "$SYS_BLOCK" ]; then
+    ui_print "! Warning: /dev/block/mapper/system not mapped yet."
+    ui_print "! Attempting TWRP logical partition mapping..."
+    blockdev --setrw /dev/block/by-name/super 2>/dev/null || true
+    if [ -b /dev/block/mapper/system ]; then
+        SYS_BLOCK="/dev/block/mapper/system"
+    fi
+fi
+
+if [ -z "$SYS_BLOCK" ] || [ ! -b "$SYS_BLOCK" ]; then
+    ui_print "[-] ERROR: Cannot locate system block device in TWRP!"
+    ui_print "    Please ensure 'System' is selectable in TWRP Mount menu."
+    exit 1
+fi
+
+ui_print "[✓] Target system partition found: $SYS_BLOCK"
+set_progress 0.15
+
+# 3. Stream system.img directly from ZIP into block device
+ui_print "- Streaming Android 13 AOSP system image to flash..."
+ui_print "  This may take 1-2 minutes, please wait..."
+unzip -p "$ZIPFILE" system.img | dd of="$SYS_BLOCK" bs=4M
+sync
+
+ui_print "[✓] System image flashed successfully!"
+set_progress 0.70
+
+# 4. Mount new system partition to inject automotive hardware bridge
+ui_print "- Mounting Android 13 system to inject automotive bridge..."
+mkdir -p /tmp/sys_mnt
+mount -t ext4 -o rw "$SYS_BLOCK" /tmp/sys_mnt || mount -o rw "$SYS_BLOCK" /tmp/sys_mnt
+
+TARGET_BIN="/tmp/sys_mnt/system/bin"
+TARGET_INIT="/tmp/sys_mnt/system/etc/init"
+TARGET_PROP="/tmp/sys_mnt/system/build.prop"
+
+if [ ! -d "$TARGET_BIN" ]; then
+    TARGET_BIN="/tmp/sys_mnt/bin"
+    TARGET_INIT="/tmp/sys_mnt/etc/init"
+    TARGET_PROP="/tmp/sys_mnt/build.prop"
+fi
+
+if [ -d "$TARGET_BIN" ]; then
+    ui_print "- Injecting native ARM64 automotive bridge binaries..."
+    unzip -o "$ZIPFILE" 'bridge/*' -d /tmp/ >/dev/null 2>&1 || true
+
+    cp /tmp/bridge/ts_mcu_daemon "$TARGET_BIN/" 2>/dev/null || true
+    cp /tmp/bridge/bd3702_init "$TARGET_BIN/" 2>/dev/null || true
+    cp /tmp/bridge/fan_governor "$TARGET_BIN/" 2>/dev/null || true
+    cp /tmp/bridge/ts_automotive_init.sh "$TARGET_BIN/" 2>/dev/null || true
+
+    chmod 755 "$TARGET_BIN/ts_mcu_daemon" 2>/dev/null || true
+    chmod 755 "$TARGET_BIN/bd3702_init" 2>/dev/null || true
+    chmod 755 "$TARGET_BIN/fan_governor" 2>/dev/null || true
+    chmod 755 "$TARGET_BIN/ts_automotive_init.sh" 2>/dev/null || true
+
+    if [ -d "$TARGET_INIT" ]; then
+        cp /tmp/bridge/ts_automotive.rc "$TARGET_INIT/" 2>/dev/null || true
+        chmod 644 "$TARGET_INIT/ts_automotive.rc" 2>/dev/null || true
+    fi
+
+    # TrebleDroid auto-run hook
+    PHH_SCRIPT="$TARGET_BIN/phh-on-boot.sh"
+    if [ -f "$PHH_SCRIPT" ]; then
+        if ! grep -q "ts_automotive_init.sh" "$PHH_SCRIPT"; then
+            echo "" >> "$PHH_SCRIPT"
+            echo "# Topway TS8667 Automotive Bridge Auto-Start" >> "$PHH_SCRIPT"
+            echo "if [ -x /system/bin/ts_automotive_init.sh ]; then" >> "$PHH_SCRIPT"
+            echo "    /system/bin/ts_automotive_init.sh &" >> "$PHH_SCRIPT"
+            echo "fi" >> "$PHH_SCRIPT"
+        fi
+    fi
+
+    # Enforce landscape display orientation
+    if [ -f "$TARGET_PROP" ]; then
+        if ! grep -q "ro.sf.hwrotation" "$TARGET_PROP"; then
+            echo "ro.sf.hwrotation=0" >> "$TARGET_PROP"
+            echo "debug.sf.latch_unsignaled=1" >> "$TARGET_PROP"
+        fi
+    fi
+    ui_print "[✓] Automotive hardware bridge injected cleanly!"
+else
+    ui_print "! Warning: Could not locate /system/bin in mounted image."
+fi
+
+set_progress 0.90
+
+# 5. Clean unmount and sync
+sync
+umount /tmp/sys_mnt 2>/dev/null || true
+rm -rf /tmp/bridge /tmp/sys_mnt 2>/dev/null || true
+
+set_progress 1.00
+
+ui_print "====================================================="
+ui_print " [✓] Android 13 AOSP Custom ROM zainstalowany!      "
+ui_print "====================================================="
+ui_print "WAZNE KROKI KONCOWE:"
+ui_print "1. Wykonaj w TWRP: Wipe -> Format Data (wpisz 'yes')."
+ui_print "2. Wybierz Reboot System."
+ui_print "3. Ciesz sie czystym Androidem 13 ze sprawnymi"
+ui_print "   przyciskami z kierownicy i dzwiekiem!"
+ui_print "====================================================="
+
+exit 0

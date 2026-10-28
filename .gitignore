@@ -14,7 +14,9 @@ custom_rom_path2/*.zip
 custom_rom_path2/apks/
 custom_rom_path2/magisk_module/system/
 
-# Large Android 13 AOSP GSI images
+# Large Android 13 AOSP GSI images & flashable ROM zips
 android13_aosp/gsi/*.img
 android13_aosp/gsi/*.img.xz
+android13_aosp/*.zip
+android13_aosp/flashable_zip/system.img
 !android13_aosp/gsi/README.md

@@ -83,23 +83,39 @@ Wszystkie demony zostały skompilowane jako **stacjonarne 64-bitowe binaria ARM6
 
 ---
 
-## 4. Dwie Metody Wgrania Czystego Androida 13
+## 4. Metody Wgrania Czystego Androida 13
 
-### Metoda 1: Przez TWRP Recovery (Bezpośrednio w aucie / z pendrive'a)
-1. Uruchom TWRP Recovery na stacji.
-2. Włóż pendrive z plikiem `system_aosp13_vanilla.img` oraz modułem `TS8667_Android13_Automotive_Bridge.zip`.
-3. W menu TWRP przejdź do: **Install -> Install Image** (przycisk w prawym dolnym rogu).
-4. Wybierz pamięć **Select Storage: USB OTG**.
-5. Wskaż plik `system_aosp13_vanilla.img`.
-6. Z listy partycji docelowych wybierz: **System Image**.
-7. Przesuń suwak **Swipe to confirm Flash**. TWRP zapisze obraz bezpośrednio do logicznego wolumenu `system` wewnątrz `super`.
-8. Przejdź do menu **Wipe -> Format Data** (wpisz `yes`, aby wyczyścić partycję danych pod nowy szyfr Androida 13).
-9. Zainstaluj moduł mostka: **Install -> Zip -> TS8667_Android13_Automotive_Bridge.zip**.
-10. Wybierz **Reboot System**.
+### Metoda 1 (ZALECANA / STANDARD BRANŻOWY): Jednolita Flashowalna Paczka ZIP w TWRP (All-in-One)
+Idąc wzorem oficjalnych custom ROM-ów (LineageOS, PixelExperience, crDroid), stworzyliśmy kompletną, gotową paczkę flashowalną w TWRP:
+- **Plik:** `AOSP13-TS8667-CustomROM-20261028-UNOFFICIAL.zip` (871 MB)
+- **Co robi skrypt `update-binary` wewnątrz zipa:**
+  1. Strumieniuje obraz `system.img` (AOSP 13) bezpośrednio do logicznego wolumenu `/dev/block/mapper/system`.
+  2. Montuje nowy system i automatycznie kopiuje do `/system/bin/` natywne binaria: `ts_mcu_daemon`, `bd3702_init`, `fan_governor` oraz skrypt startowy `ts_automotive_init.sh`.
+  3. Konfiguruje usługę startową `ts_automotive.rc` i podpina hook do `phh-on-boot.sh`.
+  4. Wymusza właściwości ekranu poziomego `ro.sf.hwrotation=0` (1280x720).
+  5. Czyści pamięć podręczną i zamyka instalację.
+
+**Instrukcja instalacji w TWRP:**
+1. W TWRP wejdź w: **Install**.
+2. Wybierz pamięć **Select Storage: USB OTG**.
+3. Wskaż plik: `AOSP13-TS8667-CustomROM-20261028-UNOFFICIAL.zip`.
+4. Przesuń suwak: **Swipe to confirm Flash**.
+5. Po zakończeniu wykonaj: **Wipe -> Format Data** (wpisz `yes`).
+6. Kliknij: **Reboot System**.
 
 ---
 
-### Metoda 2: Przez Fastbootd (Z laptopa przez kabel USB)
+### Metoda 2: Ręczne Wgranie Obrazu IMG w TWRP (Install Image)
+Jeśli wolisz wgrywać sam surowy obraz:
+1. W TWRP przejdź do: **Install -> Install Image** (przycisk w prawym dolnym rogu).
+2. Wybierz plik `aosp-arm64-ab-vanilla-13.0-20230919.img` i wskaż partycję docelową: **System Image**.
+3. Przesuń suwak **Swipe to confirm Flash**.
+4. Wgraj moduł mostka: **Install -> Zip -> TS8667_Android13_Automotive_Bridge.zip**.
+5. Wykonaj **Wipe -> Format Data** i zrestartuj stację.
+
+---
+
+### Metoda 3: Przez Fastbootd (Z laptopa przez kabel USB)
 1. Uruchom radio w trybie Fastbootd:
    ```bash
    adb reboot fastboot
