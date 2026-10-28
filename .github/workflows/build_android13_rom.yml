@@ -67,6 +67,8 @@ jobs:
 
           echo "Running unit test suite..."
           /tmp/test_mcu_protocol
+          chmod +x android13_aosp/tests/test_flasher_gates.sh
+          android13_aosp/tests/test_flasher_gates.sh
 
           echo "Running dry-run tests..."
           /tmp/host_mcu --dry-run

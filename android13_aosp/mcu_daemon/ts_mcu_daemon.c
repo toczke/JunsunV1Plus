@@ -52,6 +52,7 @@ static int run_cmd_sync(const char* file, char* const argv[]) {
     if (pid == 0) {
         // Child process: execute binary directly with explicit arguments
         execv(file, argv);
+        fprintf(stderr, "[ts_mcu_daemon] execv %s failed: %s\n", file, strerror(errno));
         _exit(127);
     }
 
@@ -422,7 +423,6 @@ int main(int argc, char** argv) {
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
-    signal(SIGCHLD, SIG_IGN); // Prevent zombie process creation
 
     printf("=====================================================\n");
     printf(" Topway TS8667 Automotive MCU Daemon v2.0 (Hardened) \n");
