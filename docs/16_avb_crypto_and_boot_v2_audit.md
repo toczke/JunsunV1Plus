@@ -39,6 +39,18 @@ fi
 ```
 The array `${avbtool_cmd[@]}` safely isolates the executable and its arguments without triggering word splitting or path truncation.
 
+### 1.3 AOSP Shell Environment & Scope of `nounset` (`set +u`)
+During earlier review iterations, it was noted that `set +u` remained active during `lunch` and compilation rather than being scoped exclusively to `build/envsetup.sh`.
+
+**Technical Rationale:**
+In AOSP and OmniROM build trees, shell scripts and functions (`build/envsetup.sh`, `lunch`, and `mka`/`soong_ui`) fundamentally rely on Bash evaluating uninitialized variables as empty strings (e.g. `build/envsetup.sh: line 646: version: unbound variable`, as observed in Run 40666992896). Enabling `set -u` (`nounset`) causes immediate execution aborts in standard AOSP functions whenever optional environment variables (`TARGET_BUILD_APPS`, `MAKECMDGOALS`, `OUT_DIR`) are unset.
+
+To ensure fail-safe execution without breaking AOSP internals:
+1. `set +u` is explicitly declared with an explanatory inline comment.
+2. `set -e` (`errexit`) remains continuously active, terminating the workflow on any non-zero exit code.
+3. `set -o pipefail` is active across all piped commands (specifically `mka recoveryimage 2>&1 | tee ...`) to prevent `tee` from masking build failures.
+4. `source build/envsetup.sh` and `lunch ...` are guarded with explicit conditional error handlers (`|| { echo "ERROR: ... failed"; exit 1; }`).
+
 ---
 
 ## 2. Android Boot Image Header v2 & Section Integrity Validation
@@ -140,88 +152,153 @@ sha256 digest of boot.img does not match digest in descriptor
 
 ## 5. Local Structural Boundary & Header Field Validation
 
-To provide verifiable artifacts rather than author declarations, the following Python script reproduces the structural boundary, offset alignment, DTBO table, and DTB table entry 0 FDT validation on both stock and TWRP images.
+To provide verifiable artifacts rather than author declarations, the repository includes [`tools/validate_boot_v2.py`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/tools/validate_boot_v2.py) which implements strict validation of:
+1. Boot Image v2 header magic, declared offsets, page size (2048/4096), and non-zero payload assertions.
+2. Full parsing of the Google Android Recovery DTBO table (`DT_TABLE_MAGIC = 0xd7b7ab1e`), enforcing standard 32-byte header, standard `entry_sz >= 32`, and validating each entry within bounds pointing to valid FDT (`0xd00dfeed`) with `fdt_totalsize == entry dt_size`.
+3. Full parsing of the Google Android DTB table, enforcing standard 32-byte header, standard `entry_sz >= 32`, and iterating across all entries, verifying that each FDT payload is within table boundaries and has matching total size.
+4. Total raw payload and minimum file size enforcement.
 
 ### 5.1 Verification Script (`tools/validate_boot_v2.py`)
 ```python
-import struct, os, sys
+import sys, struct, os
 
 def validate_v2_image(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Image not found: {path}")
+
+    file_sz = os.path.getsize(path)
     with open(path, "rb") as f:
         hdr = f.read(2048)
+        if len(hdr) < 44:
+            raise ValueError(f"Header too short: {len(hdr)} bytes")
+
         magic, k_sz, k_addr, r_sz, r_addr, s_sz, s_addr, tags_addr, page_sz, ver = struct.unpack("<8s9I", hdr[:44])
+        if magic != b"ANDROID!":
+            raise ValueError(f"Invalid magic: {magic} (expected b'ANDROID!')")
+        if ver != 2:
+            raise ValueError(f"Invalid header version: {ver} (expected 2)")
+        if page_sz not in (2048, 4096):
+            raise ValueError(f"Unexpected page size: {page_sz}")
+
         dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
         hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
 
-        assert magic == b"ANDROID!", "Magic mismatch"
-        assert ver == 2, f"Header version {ver} != 2"
-        assert page_sz in (2048, 4096), f"Unexpected page size {page_sz}"
-        assert hdr_sz >= 1660, f"Invalid header size {hdr_sz}"
-        assert k_sz > 0 and r_sz > 0 and dtbo_sz > 0 and dtb_sz > 0, "Zero-length section detected"
+        if hdr_sz < 1660:
+            raise ValueError(f"Invalid header size: {hdr_sz} < 1660")
+        if k_sz == 0:
+            raise ValueError("Kernel size is 0")
+        if r_sz == 0:
+            raise ValueError("Ramdisk size is 0")
+        if dtbo_sz == 0:
+            raise ValueError("Recovery DTBO size is 0 (required for display/touch panel)")
+        if dtb_sz == 0:
+            raise ValueError("DTB size is 0 (required for platform boot)")
 
-        def pad(sz): return ((sz + page_sz - 1) // page_sz) * page_sz
+        def pad(sz):
+            return ((sz + page_sz - 1) // page_sz) * page_sz
 
         off_k = page_sz
         off_r = off_k + pad(k_sz)
         off_s = off_r + pad(r_sz)
-
-        # 1. Declared recovery_dtbo_offset validation
         expected_dtbo_off = off_s + pad(s_sz)
-        assert dtbo_off == expected_dtbo_off, f"DTBO offset mismatch: declared {dtbo_off} != expected {expected_dtbo_off}"
 
-        # 2. DTBO Table Header & total_size validation
+        if dtbo_off != expected_dtbo_off:
+            raise ValueError(f"Declared DTBO offset mismatch: {dtbo_off} != {expected_dtbo_off}")
+
+        # Validate Recovery DTBO table structure and all entries
         f.seek(dtbo_off)
         dtbo_hdr = f.read(32)
-        dtbo_magic, dtbo_total_sz = struct.unpack(">II", dtbo_hdr[:8])
-        assert dtbo_magic == 0xd7b7ab1e, f"Invalid DTBO table magic: 0x{dtbo_magic:08x}"
-        assert dtbo_total_sz == dtbo_sz, f"DTBO total_size mismatch: table {dtbo_total_sz} != header {dtbo_sz}"
+        if len(dtbo_hdr) != 32:
+            raise ValueError("Truncated DTBO table header")
+        dtbo_magic, dtbo_total_sz, dtbo_hdr_sz, dtbo_entry_sz, dtbo_count, dtbo_entries_off, dtbo_page_sz, dtbo_ver = struct.unpack(">8I", dtbo_hdr)
 
-        # 3. DTB Table Header, Entry 0, and FDT Magic validation with strict bounds checks
+        if dtbo_magic != 0xd7b7ab1e:
+            raise ValueError(f"Invalid DTBO table magic: 0x{dtbo_magic:08x} (expected 0xd7b7ab1e)")
+        if dtbo_total_sz != dtbo_sz or dtbo_total_sz < 32:
+            raise ValueError(f"DTBO total_size mismatch: table {dtbo_total_sz} != boot header {dtbo_sz}")
+        if dtbo_hdr_sz != 32 or dtbo_entry_sz < 32 or dtbo_entries_off < 32 or dtbo_count < 1:
+            raise ValueError(f"Invalid DTBO table parameters: hdr_sz={dtbo_hdr_sz}, entry_sz={dtbo_entry_sz}, count={dtbo_count}")
+
+        dtbo_entries_end = dtbo_entries_off + (dtbo_count * dtbo_entry_sz)
+        if dtbo_entries_end > dtbo_total_sz:
+            raise ValueError(f"DTBO entries exceed table total_size: {dtbo_entries_end} > {dtbo_total_sz}")
+
+        for i in range(dtbo_count):
+            f.seek(dtbo_off + dtbo_entries_off + (i * dtbo_entry_sz))
+            entry_bytes = f.read(dtbo_entry_sz)
+            if len(entry_bytes) < 32:
+                raise ValueError(f"Truncated DTBO entry {i}")
+            e_sz, e_off = struct.unpack(">II", entry_bytes[:8])
+            if e_off < dtbo_entries_end or (e_off + e_sz) > dtbo_total_sz:
+                raise ValueError(f"DTBO entry {i} bounds violation: [{e_off}, {e_off + e_sz}] in total {dtbo_total_sz}")
+            f.seek(dtbo_off + e_off)
+            fdt_hdr = f.read(8)
+            if len(fdt_hdr) != 8:
+                raise ValueError(f"Truncated FDT header in DTBO entry {i}")
+            fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
+            if fdt_magic != 0xd00dfeed:
+                raise ValueError(f"Invalid FDT magic in DTBO entry {i}: 0x{fdt_magic:08x}")
+            if fdt_totalsize != e_sz:
+                raise ValueError(f"DTBO entry {i} FDT totalsize {fdt_totalsize} != entry dt_size {e_sz}")
+
+        # Validate DTB table structure and all entries
         off_dtb = dtbo_off + pad(dtbo_sz)
         f.seek(off_dtb)
         dtb_hdr = f.read(32)
-        assert len(dtb_hdr) == 32, "Truncated DTB table header"
-        dtb_magic, dtb_total_sz, dtb_hdr_sz, entry_sz, entry_count, entries_off = struct.unpack(">IIIIII", dtb_hdr[:24])
-        assert dtb_magic == 0xd7b7ab1e, f"Invalid DTB magic: 0x{dtb_magic:08x}"
-        assert dtb_total_sz == dtb_sz and dtb_total_sz >= 32, "Invalid DTB total_size"
-        assert dtb_hdr_sz >= 32, "Invalid DTB header size"
-        assert entry_sz >= 8, "Invalid DTB entry size"
-        assert entries_off >= dtb_hdr_sz, "Invalid DTB entries offset"
-        assert entry_count >= 1, "DTB table has no entries"
+        if len(dtb_hdr) != 32:
+            raise ValueError("Truncated DTB table header")
+        dtb_magic, dtb_total_sz, dtb_hdr_sz, entry_sz, entry_count, entries_off, dtb_page_sz, dtb_ver = struct.unpack(">8I", dtb_hdr)
+
+        if dtb_magic != 0xd7b7ab1e:
+            raise ValueError(f"Invalid DTB magic: 0x{dtb_magic:08x} (expected 0xd7b7ab1e)")
+        if dtb_total_sz != dtb_sz or dtb_total_sz < 32:
+            raise ValueError(f"Invalid DTB table size: {dtb_total_sz} != {dtb_sz} or < 32")
+        if dtb_hdr_sz != 32:
+            raise ValueError(f"Invalid DTB header size: {dtb_hdr_sz} != 32")
+        if entry_sz < 32:
+            raise ValueError(f"Invalid DTB entry size: {entry_sz} < 32")
+        if entries_off < dtb_hdr_sz:
+            raise ValueError(f"Invalid DTB entries offset: {entries_off} < {dtb_hdr_sz}")
+        if entry_count < 1:
+            raise ValueError(f"DTB entry count < 1: {entry_count}")
 
         entries_end = entries_off + (entry_count * entry_sz)
-        assert entries_end <= dtb_total_sz, "DTB entries exceed table boundary"
+        if entries_end > dtb_total_sz:
+            raise ValueError(f"DTB entries boundary {entries_end} exceeds table size {dtb_total_sz}")
 
-        # Read Entry 0 pointing to FDT payload and verify within bounds
-        f.seek(off_dtb + entries_off)
-        entry0 = f.read(entry_sz)
-        assert len(entry0) >= 8, "Truncated DTB entry 0"
-        entry0_sz, entry0_off = struct.unpack(">II", entry0[:8])
-        assert entry0_off >= entries_end, "Entry 0 overlaps entries table"
-        assert (entry0_off + entry0_sz) <= dtb_total_sz, "Entry 0 exceeds DTB table boundary"
+        for i in range(entry_count):
+            f.seek(off_dtb + entries_off + (i * entry_sz))
+            entry_data = f.read(entry_sz)
+            if len(entry_data) < 32:
+                raise ValueError(f"Truncated entry {i} read in DTB table")
+            e_sz, e_off = struct.unpack(">II", entry_data[:8])
 
-        f.seek(off_dtb + entry0_off)
-        fdt_hdr = f.read(8)
-        assert len(fdt_hdr) == 8, "Truncated FDT header"
-        fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
-        assert fdt_magic == 0xd00dfeed, f"Invalid FDT magic: 0x{fdt_magic:08x}"
-        assert fdt_totalsize == entry0_sz, f"FDT totalsize {fdt_totalsize} != entry dt_size {entry0_sz}"
+            if e_off < entries_end:
+                raise ValueError(f"DTB Entry {i} offset {e_off} overlaps entries table (end={entries_end})")
+            if (e_off + e_sz) > dtb_total_sz:
+                raise ValueError(f"DTB Entry {i} FDT payload {e_off + e_sz} exceeds DTB table size {dtb_total_sz}")
+
+            f.seek(off_dtb + e_off)
+            fdt_hdr = f.read(8)
+            if len(fdt_hdr) != 8:
+                raise ValueError(f"Truncated FDT header read for DTB entry {i}")
+            fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
+            if fdt_magic != 0xd00dfeed:
+                raise ValueError(f"Invalid FDT magic at DTB entry {i} offset +{e_off}: 0x{fdt_magic:08x}")
+            if fdt_totalsize != e_sz:
+                raise ValueError(f"DTB Entry {i} FDT totalsize {fdt_totalsize} != dt_size {e_sz}")
 
         total_payload = off_dtb + pad(dtb_sz)
-        f.seek(0, 2)
-        file_sz = f.tell()
-        assert file_sz >= total_payload, f"File size {file_sz} < payload {total_payload}"
-        return {
-            "page_sz": page_sz, "hdr_sz": hdr_sz,
-            "k_sz": k_sz, "r_sz": r_sz,
-            "dtbo_off": dtbo_off, "dtbo_sz": dtbo_sz,
-            "dtb_off": off_dtb, "dtb_sz": dtb_sz,
-            "fdt_offset": off_dtb + entry0_off, "fdt_size": fdt_totalsize,
-            "payload": total_payload, "file_sz": file_sz
-        }
+        if file_sz < total_payload:
+            raise ValueError(f"Image file size {file_sz} < calculated payload {total_payload}")
 
-print("Stock Recovery:", validate_v2_image("output_images/recovery_stock.img"))
-print("TWRP Recovery:", validate_v2_image("output_images/twrp_fixed_32mb.img"))
+        return {
+            "version": ver, "page_size": page_sz,
+            "kernel_size": k_sz, "ramdisk_size": r_sz,
+            "dtbo_offset": dtbo_off, "dtbo_size": dtbo_sz, "dtbo_entries": dtbo_count,
+            "dtb_offset": off_dtb, "dtb_size": dtb_sz, "dtb_entries": entry_count,
+            "total_payload": total_payload, "file_size": file_sz
+        }
 ```
 
 ### 5.2 Input Files & Reference Checksums
@@ -230,10 +307,36 @@ print("TWRP Recovery:", validate_v2_image("output_images/twrp_fixed_32mb.img"))
 | `output_images/recovery_stock.img` | 33,554,432 | `7c453aef9cfcddf4c0d2dfa0fe88e2c2e4ffffd584821248a5c101b74638372f` |
 | `output_images/twrp_fixed_32mb.img` | 33,554,432 | `1acae228adeb10e97f475679e0959ce0acba312184c88a3b644ed164a5b2306b` |
 
-### 5.3 Executed Output
+### 5.3 Executed Output (`./tools/validate_boot_v2.py`)
 ```text
-Stock Recovery: {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 6586823, 'dtbo_off': 17922048, 'dtbo_sz': 48358, 'dtb_off': 17971200, 'dtb_sz': 105691, 'fdt_offset': 17971264, 'fdt_size': 105627, 'payload': 18077696, 'file_sz': 33554432}
-TWRP Recovery:  {'page_sz': 2048, 'hdr_sz': 1660, 'k_sz': 11330259, 'r_sz': 18494707, 'dtbo_off': 29829120, 'dtbo_sz': 48358, 'dtb_off': 29878272, 'dtb_sz': 105691, 'fdt_offset': 29878336, 'fdt_size': 105627, 'payload': 29984768, 'file_sz': 33554432}
+PASS: output_images/recovery_stock.img
+  file: output_images/recovery_stock.img
+  version: 2
+  page_size: 2048
+  kernel_size: 11330259
+  ramdisk_size: 6586823
+  dtbo_offset: 17922048
+  dtbo_size: 48358
+  dtbo_entries: 1
+  dtb_offset: 17971200
+  dtb_size: 105691
+  dtb_entries: 1
+  total_payload: 18077696
+  file_size: 33554432
+PASS: output_images/twrp_fixed_32mb.img
+  file: output_images/twrp_fixed_32mb.img
+  version: 2
+  page_size: 2048
+  kernel_size: 11330259
+  ramdisk_size: 18494707
+  dtbo_offset: 29829120
+  dtbo_size: 48358
+  dtbo_entries: 1
+  dtb_offset: 29878272
+  dtb_size: 105691
+  dtb_entries: 1
+  total_payload: 29984768
+  file_size: 33554432
 ```
 
 ---
@@ -256,4 +359,5 @@ Before any flashing is approved for end users, the recovery image must pass the 
 | Run ID | Commit | Description | Artifact Output | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | [`40661162555`](https://github.com/toczke/JunsunV1Plus/actions/runs/40661162555) | `c777980` | Flasher APK Build | `app-debug.apk` (`f05f7200...`) | **SUCCESS** |
-| `pending` | `HEAD` | Hardened TWRP Build (Bounds Check & Lunch Error Handling) | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **QUEUED** |
+| [`40668649073`](https://github.com/toczke/JunsunV1Plus/actions/runs/40668649073) | [`124b8e9`](https://github.com/toczke/JunsunV1Plus/commit/124b8e9c7c74e2634058718223eafed68e58f35d) | Hardened TWRP Build (Bounds Check & Lunch Error Handling) | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **BUILDING** |
+| `pending` | `HEAD` | Standard 32-Byte DT Entry & Multi-Entry Table Validator | Recovery image, AVB structural report, Cryptographic report, SHA-256 | **QUEUED** |
