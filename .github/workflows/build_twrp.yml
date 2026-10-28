@@ -107,18 +107,12 @@ jobs:
 
           cp "$OUT_DIR/recovery.img" ./twrp_raw.img
 
-          # Locate avbtool and patch legacy Python 2 long integer syntax (2L**) for Python 3 compatibility
-          AVBTOOL_SCRIPT="$HOME/twrp/external/avb/avbtool"
-          if [ -f "$AVBTOOL_SCRIPT" ]; then
-            sed -i 's/2L\*\*/2\*\*/g' "$AVBTOOL_SCRIPT"
-            avbtool_cmd=(python3 "$AVBTOOL_SCRIPT")
-          elif command -v avbtool >/dev/null 2>&1; then
-            avbtool_cmd=(avbtool)
-          else
-            echo "ERROR: avbtool not found at $AVBTOOL_SCRIPT or in PATH"
-            exit 1
-          fi
+          # Canonical pure Python 3 avbtool (AOSP 1.2.0) and Boot v2 validator pre-flight syntax checks
+          python3 -m py_compile tools/avbtool
+          python3 -m py_compile tools/validate_boot_v2.py
+          avbtool_cmd=(python3 tools/avbtool)
           echo "Using AVB command: ${avbtool_cmd[*]}"
+          "${avbtool_cmd[@]}" version
 
           # Determine RSA key for AVB signing
           AVB_KEY="$HOME/twrp/external/avb/test/data/testkey_rsa2048.pem"

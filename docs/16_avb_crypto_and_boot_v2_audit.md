@@ -50,6 +50,21 @@ To ensure fail-safe execution without breaking AOSP internals:
 2. `set -e` (`errexit`) remains continuously active. While Bash does have well-known context-dependent edge cases regarding `set -e` (e.g. within subshells or conditional compound commands), all critical commands in this workflow (`envsetup.sh`, `lunch`) have explicit conditional error handlers (`|| { echo "ERROR: ... failed"; exit 1; }`).
 3. `set -o pipefail` is active across all piped commands (specifically `mka recoveryimage 2>&1 | tee ...`) to prevent `tee` from masking build failures.
 
+### 1.4 Elimination of Python 2 Syntax Incompatibilities via Bundled Canonical `avbtool` 1.2.0
+In CI run 40678361305, the initial `sed` patch (`s/2L\*\*/2\*\*/g`) allowed `extract_public_key`, `add_hash_footer`, and `info_image` to execute successfully under Python 3. However, subsequent execution of `avbtool verify_image` failed due to legacy Python 2 syntax at line 2251:
+```
+File ".../external/avb/avbtool", line 2251
+  print 'Verifying image {} using key at {}'.format(image_filename, key_path)
+SyntaxError: Missing parentheses in call to 'print'. Did you mean print(...)?
+```
+This confirmed the peer-review audit warning that ad-hoc regex patches on legacy AOSP Python 2 scripts are fragile and non-exhaustive.
+
+To permanently resolve all Python 2/3 incompatibilities across the signing and verification toolchain:
+1. The repository bundles the official canonical AOSP `avbtool` (version 1.2.0, from `platform/external/avb` release branch `android12-release`) located at [`tools/avbtool`](file:///home/tomasztoczek/Documents/GitHub/JunsunV1Plus/tools/avbtool).
+2. It relies exclusively on the standard Python 3 runtime library with zero third-party dependencies.
+3. Pre-flight bytecode compilation checks (`python3 -m py_compile tools/avbtool` and `python3 -m py_compile tools/validate_boot_v2.py`) are strictly enforced in CI before executing any image modifications.
+4. Developers and auditors can run AVB verification and inspection locally on dumped partitions without checking out the OmniROM/AOSP source tree.
+
 ---
 
 ## 2. Android Boot Image Header v2 & Section Integrity Validation
@@ -295,4 +310,5 @@ Before performing any write operations to the physical eMMC storage of the TS866
 | [`40661162555`](https://github.com/toczke/JunsunV1Plus/actions/runs/40661162555) | `c777980` | Flasher APK Build | `app-debug.apk` (`f05f7200...`) | **SUCCESS** |
 | [`40668649073`](https://github.com/toczke/JunsunV1Plus/actions/runs/40668649073) | [`124b8e9`](https://github.com/toczke/JunsunV1Plus/commit/124b8e9c7c74e2634058718223eafed68e58f35d) | Hardened TWRP Build | Blocked: `ValueError: Expected v2, got version 0` | **BLOCKED BY VALIDATOR** |
 | [`40674827850`](https://github.com/toczke/JunsunV1Plus/actions/runs/40674827850) | [`09f6cf1`](https://github.com/toczke/JunsunV1Plus/commit/09f6cf1c9e03bd8c63605b8d310d6cfc765ac0d5) | BoardConfig.mk v2 + Unified Validator | Boot v2 Verified (`3ca009e4...`), failed on Python 2 syntax in avbtool (`2L**32`) | **SYNTAX ERROR IN AVBTOOL** |
-| [`40678361305`](https://github.com/toczke/JunsunV1Plus/actions/runs/40678361305) | [`0107e80`](https://github.com/toczke/JunsunV1Plus/commit/0107e8080af19965b4c04ee8dab05c56bce9e6ea) | Patch `2L**` in `avbtool` for Python 3 compatibility | Final signed image and complete 8-file artifact package | **BUILDING** |
+| [`40678361305`](https://github.com/toczke/JunsunV1Plus/actions/runs/40678361305) | [`0107e80`](https://github.com/toczke/JunsunV1Plus/commit/0107e8080af19965b4c04ee8dab05c56bce9e6ea) | Patch `2L**` in `avbtool` for Python 3 compatibility | Raw payload verified (`f0d2bbca...`), footer added, failed on line 2251 (`print 'Verifying...'`) | **PYTHON 2 PRINT SYNTAX ERROR** |
+| Pending | Local | Canonical Python 3 `avbtool` 1.2.0 in `tools/` with `py_compile` checks | Final signed image and complete 8-file artifact package | **QUEUED** |

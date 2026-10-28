@@ -5,6 +5,8 @@ vendor/
 .gradle/
 **/build/
 *.idsig
+__pycache__/
+*.pyc
 
 # Large binary partition dumps & diagnostic packages
 diag_pack.tar.gz
