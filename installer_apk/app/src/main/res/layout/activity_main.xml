@@ -17,28 +17,28 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Junsun V1 Plus / TS8667 Root &amp; TWRP Flasher"
+            android:text="Topway TS8667 / Junsun V1 Plus Partition Flasher"
             android:textColor="#FFFFFF"
-            android:textSize="20sp"
+            android:textSize="18sp"
             android:textStyle="bold" />
 
         <Button
             android:id="@+id/btn_adb_wifi"
             android:layout_width="wrap_content"
-            android:layout_height="48dp"
-            android:text="⚡ ADB Wi-Fi"
+            android:layout_height="44dp"
+            android:text="ADB over Wi-Fi"
             android:textSize="12sp"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#0088CC" />
+            android:backgroundTint="#006699" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/tv_root_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Sprawdzanie uprawnień (ffsu)..."
+        android:text="Checking root permissions..."
         android:textColor="#FFBB33"
-        android:textSize="14sp"
+        android:textSize="13sp"
         android:layout_marginTop="4dp" />
 
     <!-- Action Buttons Grid: Row 1 -->
@@ -52,37 +52,37 @@
         <Button
             android:id="@+id/btn_flash_magisk"
             android:layout_width="0dp"
-            android:layout_height="62dp"
+            android:layout_height="56dp"
             android:layout_weight="1"
-            android:text="🔥 1. ZAINSTALUJ ROOT (MAGISK)"
+            android:text="Flash Root (boot.img)"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#2E7D32"
+            android:backgroundTint="#1B5E20"
             android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_flash_twrp_ffup"
+            android:id="@+id/btn_flash_twrp"
             android:layout_width="0dp"
-            android:layout_height="62dp"
+            android:layout_height="56dp"
             android:layout_weight="1"
-            android:text="🛠️ 2. WGRAJ TWRP &amp; START (FFUP)"
+            android:text="Flash TWRP (recovery.img)"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#1565C0"
+            android:backgroundTint="#0D47A1"
             android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_fix_boot"
+            android:id="@+id/btn_reboot_recovery"
             android:layout_width="0dp"
-            android:layout_height="62dp"
+            android:layout_height="56dp"
             android:layout_weight="1"
-            android:text="🛡️ 3. NAPRAW START (CLEAR MISC &amp; BOOT)"
+            android:text="Reboot Recovery (ffup)"
             android:textSize="12sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
-            android:backgroundTint="#D84315" />
+            android:backgroundTint="#E65100" />
     </LinearLayout>
 
     <!-- Action Buttons Grid: Row 2 -->
@@ -96,30 +96,34 @@
         <Button
             android:id="@+id/btn_backup"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="50dp"
             android:layout_weight="1"
-            android:text="💾 Backup Boot &amp; Recovery"
+            android:text="Backup Partitions"
             android:textSize="12sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#37474F"
             android:layout_marginEnd="6dp" />
 
         <Button
             android:id="@+id/btn_restore_stock"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="50dp"
             android:layout_weight="1"
-            android:text="🔄 Przywróć Fabryczny Stock"
+            android:text="Restore Stock Boot/Recovery"
             android:textSize="12sp"
-            android:backgroundTint="#424242"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#4E342E"
             android:layout_marginEnd="6dp" />
 
         <Button
-            android:id="@+id/btn_reboot"
+            android:id="@+id/btn_reboot_system"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="50dp"
             android:layout_weight="1"
-            android:text="🔁 Restartuj Radio"
+            android:text="Reboot System"
             android:textSize="12sp"
-            android:backgroundTint="#C62828" />
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#B71C1C" />
     </LinearLayout>
 
     <!-- Detection Info -->
@@ -127,7 +131,7 @@
         android:id="@+id/tv_file_info"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Wykrywanie plików z pendrive..."
+        android:text="Scanning external storage for images..."
         android:textColor="#AAAAAA"
         android:textSize="12sp"
         android:layout_marginTop="8dp" />
@@ -146,9 +150,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
-            android:textColor="#00FF00"
+            android:textColor="#00E676"
             android:textSize="12sp"
-            android:text="[System initialized and ready]\n" />
+            android:text="[System initialized. Ready for operations.]\n" />
     </ScrollView>
 
 </LinearLayout>

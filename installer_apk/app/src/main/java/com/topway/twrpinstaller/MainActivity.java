@@ -3,7 +3,6 @@ package com.topway.twrpinstaller;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
@@ -12,10 +11,13 @@ import android.widget.TextView;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.security.MessageDigest;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Enumeration;
@@ -26,7 +28,6 @@ import java.util.regex.Pattern;
 public class MainActivity extends Activity {
 
     private static final String FFSU_BIN = "/system/xbin/ffsu";
-    // Hardware vendor backdoor key discovered in ffsu binary
     private static final String FFSU_BACKDOOR_KEY = "@#zxcvbnmasdfghjklqwertyuiop1234567890,.";
 
     private TextView tvRootStatus;
@@ -35,11 +36,11 @@ public class MainActivity extends Activity {
 
     private Button btnAdbWifi;
     private Button btnFlashMagisk;
-    private Button btnFlashTwrpFfup;
-    private Button btnFixBoot;
+    private Button btnFlashTwrp;
+    private Button btnRebootRecovery;
     private Button btnBackup;
     private Button btnRestoreStock;
-    private Button btnReboot;
+    private Button btnRebootSystem;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean isRootAvailable = false;
@@ -56,21 +57,21 @@ public class MainActivity extends Activity {
 
         btnAdbWifi = findViewById(R.id.btn_adb_wifi);
         btnFlashMagisk = findViewById(R.id.btn_flash_magisk);
-        btnFlashTwrpFfup = findViewById(R.id.btn_flash_twrp_ffup);
-        btnFixBoot = findViewById(R.id.btn_fix_boot);
+        btnFlashTwrp = findViewById(R.id.btn_flash_twrp);
+        btnRebootRecovery = findViewById(R.id.btn_reboot_recovery);
         btnBackup = findViewById(R.id.btn_backup);
         btnRestoreStock = findViewById(R.id.btn_restore_stock);
-        btnReboot = findViewById(R.id.btn_reboot);
+        btnRebootSystem = findViewById(R.id.btn_reboot_system);
 
-        checkExploitStatus();
+        checkRootStatus();
 
         btnAdbWifi.setOnClickListener(v -> runEnableAdbWifi());
         btnFlashMagisk.setOnClickListener(v -> runFlashMagiskRoot());
-        btnFlashTwrpFfup.setOnClickListener(v -> runFlashTwrpFfup());
-        btnFixBoot.setOnClickListener(v -> runFixBootLoop());
+        btnFlashTwrp.setOnClickListener(v -> runFlashTwrpRecovery());
+        btnRebootRecovery.setOnClickListener(v -> runRebootRecovery());
         btnBackup.setOnClickListener(v -> runBackupAll());
         btnRestoreStock.setOnClickListener(v -> runRestoreStock());
-        btnReboot.setOnClickListener(v -> runReboot());
+        btnRebootSystem.setOnClickListener(v -> runRebootSystem());
     }
 
     private void log(String msg) {
@@ -80,32 +81,31 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void checkExploitStatus() {
+    private void checkRootStatus() {
         new Thread(() -> {
             String result = executeRootCommand("id");
             if (result.contains("uid=0")) {
                 isRootAvailable = true;
                 mainHandler.post(() -> {
-                    tvRootStatus.setText("Status ROOT: AKTYWNY (uid=0) - Pełne uprawnienia!");
-                    tvRootStatus.setTextColor(0xFF00FF00); // Green
+                    tvRootStatus.setText("Root Privileges: Active (uid=0)");
+                    tvRootStatus.setTextColor(0xFF00E676); // Green
                 });
-                log("Uprawnienia ROOT potwierdzone pomyślnie.");
+                log("Root privileges confirmed.");
                 runEnableAdbWifi();
                 scanAvailableFiles();
             } else {
                 isRootAvailable = false;
                 mainHandler.post(() -> {
-                    tvRootStatus.setText("Ostrzeżenie: Brak uprawnień roota (" + result.trim() + ")");
-                    tvRootStatus.setTextColor(0xFFFF4444); // Red
+                    tvRootStatus.setText("Warning: Root privileges not available (" + result.trim() + ")");
+                    tvRootStatus.setTextColor(0xFFFF5252); // Red
                 });
-                log("Błąd uzyskania uprawnień roota: " + result.trim());
+                log("Failed to acquire root privileges: " + result.trim());
             }
         }).start();
     }
 
     private String getLocalIpAddress() {
         try {
-            // First check Wi-Fi interface (wlan0)
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
                 NetworkInterface intf = en.nextElement();
                 String name = intf.getName().toLowerCase(Locale.US);
@@ -121,7 +121,6 @@ public class MainActivity extends Activity {
                     }
                 }
             }
-            // General fallback across any active non-loopback network interface
             for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
                 NetworkInterface intf = en.nextElement();
                 if (intf.isLoopback() || !intf.isUp()) continue;
@@ -136,10 +135,9 @@ public class MainActivity extends Activity {
                 }
             }
         } catch (Exception ex) {
-            log("Błąd odczytu IP: " + ex.getMessage());
+            log("IP detection error: " + ex.getMessage());
         }
 
-        // Secondary fallback: parse 'ip addr show' with strict IPv4 regex
         try {
             String out = executeRootCommand("ip -4 addr show 2>/dev/null");
             Pattern p = Pattern.compile("inet\\s+([0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+)");
@@ -157,36 +155,38 @@ public class MainActivity extends Activity {
 
     private void runEnableAdbWifi() {
         new Thread(() -> {
-            log("Konfiguracja ADB przez Wi-Fi (port 5555)...");
-            executeRootCommand("setprop service.adb.tcp.port 5555 && stop adbd && start adbd");
+            log("Configuring ADB over Wi-Fi (port 5555)...");
+            executeRootCommand("setprop service.adb.tcp.port 5555");
+            executeRootCommand("stop adbd");
+            executeRootCommand("start adbd");
 
             String ip = getLocalIpAddress();
-            if (ip != null && !ip.isEmpty()) {
-                final String targetIp = ip;
-                mainHandler.post(() -> {
-                    tvRootStatus.setText("ADB aktywne: adb connect " + targetIp + ":5555");
-                    tvRootStatus.setTextColor(0xFF00E5FF);
-                });
-                log("ADB PO WI-FI AKTYWNE: adb connect " + targetIp + ":5555");
+            if (ip != null) {
+                log("ADB over Wi-Fi active: adb connect " + ip + ":5555");
             } else {
-                mainHandler.post(() -> {
-                    tvRootStatus.setText("ADB aktywne na porcie 5555 (brak aktywnego IP Wi-Fi)");
-                    tvRootStatus.setTextColor(0xFFFFAA00);
-                });
-                log("ADB aktywne na porcie 5555. Połącz stację z Wi-Fi, aby zobaczyć IP.");
+                log("ADB over Wi-Fi configured on port 5555 (waiting for Wi-Fi IP).");
             }
         }).start();
     }
 
     private String findBlockDevice(String partitionName) {
-        String[] candidates = new String[]{
-                "/dev/block/by-name/" + partitionName,
-                "/dev/block/platform/bootdevice/by-name/" + partitionName
-        };
-        for (String c : candidates) {
-            String out = executeRootCommand("[ -b \"" + c + "\" ] && echo EXISTS || true");
-            if (out.contains("EXISTS")) {
-                return c;
+        String byName = "/dev/block/by-name/" + partitionName;
+        String check = executeRootCommand("[ -b " + byName + " ] && echo EXISTS || echo NO").trim();
+        if ("EXISTS".equals(check)) {
+            return byName;
+        }
+
+        String platformByName = "/dev/block/platform/bootdevice/by-name/" + partitionName;
+        check = executeRootCommand("[ -b " + platformByName + " ] && echo EXISTS || echo NO").trim();
+        if ("EXISTS".equals(check)) {
+            return platformByName;
+        }
+
+        for (int i = 1; i <= 45; i++) {
+            String p = "/dev/block/mmcblk0p" + i;
+            String link = executeRootCommand("ls -l /dev/block/by-name/ 2>/dev/null | grep -w " + partitionName + " || true").trim();
+            if (link.contains("mmcblk0p" + i)) {
+                return p;
             }
         }
         String out = executeRootCommand("find /dev/block -name " + partitionName + " 2>/dev/null | head -n 1").trim();
@@ -211,138 +211,231 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             String magiskImg = findFile("boot_magisk_patched.img", "magisk_boot.img");
             String twrpImg = findFile("twrp_fixed_32mb.img", "twrp.img");
-            String stockBoot = findFile("boot_stock.img", "stock_boot.img", "boot.img");
+            String stockBoot = findFile("boot_stock.img", "stock_boot.img");
+            String stockRec = findFile("recovery.img", "stock_recovery.img");
 
-            StringBuilder sb = new StringBuilder("Wykryto pliki: ");
-            if (magiskImg != null) sb.append("[Magisk Boot: OK] ");
-            if (twrpImg != null) sb.append("[TWRP: OK] ");
-            if (stockBoot != null) sb.append("[Stock Boot: OK] ");
+            StringBuilder sb = new StringBuilder("Storage: ");
+            sb.append(magiskImg != null ? "[Magisk Boot: OK] " : "[Magisk Boot: Missing] ");
+            sb.append(twrpImg != null ? "[TWRP: OK] " : "[TWRP: Missing] ");
+            sb.append(stockBoot != null ? "[Stock Boot: OK] " : "[Stock Boot: Missing] ");
+            sb.append(stockRec != null ? "[Stock Recovery: OK] " : "[Stock Recovery: Missing] ");
 
             mainHandler.post(() -> tvFileInfo.setText(sb.toString()));
         }).start();
     }
 
+    private String computeFileSha256(String filePath, long maxBytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            FileInputStream fis = new FileInputStream(new File(filePath));
+            byte[] buffer = new byte[65536];
+            long bytesReadTotal = 0;
+            int n;
+            while ((n = fis.read(buffer)) != -1) {
+                if (maxBytes > 0 && bytesReadTotal + n > maxBytes) {
+                    digest.update(buffer, 0, (int)(maxBytes - bytesReadTotal));
+                    break;
+                }
+                digest.update(buffer, 0, n);
+                bytesReadTotal += n;
+            }
+            fis.close();
+            byte[] hash = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            log("Error computing file SHA-256: " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private String computePartitionSha256(String blockDev, long byteCount) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            Process process;
+            File ffsu = new File(FFSU_BIN);
+            if (ffsu.exists()) {
+                process = Runtime.getRuntime().exec(new String[]{FFSU_BIN, FFSU_BACKDOOR_KEY});
+            } else {
+                process = Runtime.getRuntime().exec("su");
+            }
+
+            DataOutputStream os = new DataOutputStream(process.getOutputStream());
+            long blocks = byteCount / 65536;
+            os.writeBytes("dd if=" + blockDev + " bs=65536 count=" + blocks + " 2>/dev/null\n");
+            os.writeBytes("exit\n");
+            os.flush();
+
+            InputStream is = process.getInputStream();
+            byte[] buffer = new byte[65536];
+            int n;
+            long total = 0;
+            while ((n = is.read(buffer)) != -1) {
+                digest.update(buffer, 0, n);
+                total += n;
+            }
+            process.waitFor();
+
+            byte[] hash = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            log("Error computing partition SHA-256: " + ex.getMessage());
+            return null;
+        }
+    }
+
     /**
-     * Option 1: Installs Magisk root cleanly via boot partition (PO BOŻEMU)
-     * Flashes verified boot image AND clears misc to avoid recovery/fastboot loops.
+     * Flashes verified boot image to boot partition ONLY.
+     * Performs automatic safety backup and post-flash SHA-256 integrity verification.
      */
     private void runFlashMagiskRoot() {
         new Thread(() -> {
-            log(">>> [1/5] Rozpoczynanie instalacji Root Magisk...");
+            log(">>> [1/5] Initiating Magisk Root installation (boot.img)...");
             String magiskImg = findFile("boot_magisk_patched.img", "magisk_boot.img");
             if (magiskImg == null) {
-                log("BŁĄD: Nie znaleziono obrazu boot_magisk_patched.img na USB/SD!");
+                log("[ERROR] boot_magisk_patched.img not found on external storage!");
                 return;
             }
 
+            File srcFile = new File(magiskImg);
+            long fileSize = srcFile.length();
             String bootDev = findBlockDevice("boot");
             String miscDev = findBlockDevice("misc");
-            log("Znaleziono obraz Magisk: " + magiskImg);
-            log("Docelowa partycja boot: " + bootDev);
 
-            // Safety backup
-            log(">>> [2/5] Zrzut kopii zapasowej obecnego boot.img...");
-            String backupPath = "/sdcard/RecoveryBackup/stock_boot_auto_backup.img";
+            log("Source: " + magiskImg + " (" + fileSize + " bytes)");
+            log("Target Partition: " + bootDev);
+
+            // 1. Compute source checksum
+            log(">>> [2/5] Computing source SHA-256 checksum...");
+            String srcHash = computeFileSha256(magiskImg, fileSize);
+            log("Source SHA-256: " + srcHash);
+
+            // 2. Backup current boot
+            log(">>> [3/5] Backing up current boot partition...");
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            String backupPath = "/sdcard/RecoveryBackup/boot_backup_" + timeStamp + ".img";
             executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + bootDev + " of=" + backupPath + " bs=4M");
 
-            // Flash
-            log(">>> [3/5] Wgrywanie spatchowanego boot.img (Magisk)...");
-            String res = executeRootCommand("dd if=\"" + magiskImg + "\" of=\"" + bootDev + "\" bs=4M");
-            log(res.trim());
-
-            // Clear misc to prevent any accidental recovery/fastboot trigger
-            log(">>> [4/5] Czyszczenie nagłówka misc (zapobieganie pętlom bootowania)...");
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
-
-            log(">>> [5/5] Synchronizacja pamięci flash (sync)...");
+            // 3. Write boot partition
+            log(">>> [4/5] Writing Magisk boot image to " + bootDev + "...");
+            executeRootCommand("dd if=\"" + magiskImg + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
             executeRootCommand("sync");
 
-            log("==================================================");
-            log("SUKCES! Magisk Boot został wgrany na partycję boot!");
-            log("Zrestartuj radio przyciskiem 'Restartuj Radio', aby mieć pełnego Roota.");
-            log("==================================================");
+            // Clear misc to prevent any boot loop
+            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+            executeRootCommand("sync");
+
+            // 4. Verify post-flash integrity
+            log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
+            String partHash = computePartitionSha256(bootDev, fileSize);
+            log("eMMC Partition SHA-256: " + partHash);
+
+            if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
+                log("==================================================");
+                log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
+                log("Magisk boot image written and verified on eMMC flash.");
+                log("Reboot device via 'Reboot System' to enter rooted Android.");
+                log("==================================================");
+            } else {
+                log("==================================================");
+                log("[CRITICAL ERROR] SHA-256 mismatch detected!");
+                log("Restoring backup immediately to prevent brick...");
+                executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+                executeRootCommand("sync");
+                log("Safety backup restored. Boot partition is safe.");
+                log("==================================================");
+            }
         }).start();
     }
 
     /**
-     * Option 2: Flashes TWRP and triggers Topway LittleKernel RECOVERY via 'ffup'
-     * Flashes ONLY to recovery partition. Never touches boot!
+     * Flashes TWRP recovery image to recovery partition ONLY.
+     * Never touches boot partition! Performs SHA-256 integrity verification.
      */
-    private void runFlashTwrpFfup() {
+    private void runFlashTwrpRecovery() {
         new Thread(() -> {
-            log(">>> [1/5] Przygotowanie TWRP oraz wyzwalacza ffup...");
+            log(">>> [1/5] Initiating TWRP Recovery installation (recovery.img)...");
             String twrpImg = findFile("twrp_fixed_32mb.img", "twrp.img");
             if (twrpImg == null) {
-                log("BŁĄD: Nie znaleziono pliku twrp_fixed_32mb.img ani twrp.img!");
+                log("[ERROR] twrp_fixed_32mb.img or twrp.img not found!");
                 return;
             }
 
+            File srcFile = new File(twrpImg);
+            long fileSize = srcFile.length();
             String recDev = findBlockDevice("recovery");
-            String miscDev = findBlockDevice("misc");
-            log("Obraz TWRP: " + twrpImg);
-            log("Docelowa partycja recovery: " + recDev);
 
-            // Flash TWRP
-            log(">>> [2/5] Wgrywanie TWRP wyłącznie na partycję recovery...");
-            executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + recDev + "\" bs=4M");
+            log("Source: " + twrpImg + " (" + fileSize + " bytes)");
+            log("Target Partition: " + recDev + " (RECOVERY ONLY)");
 
-            // Write 'ffup' into misc
-            log(">>> [3/5] Zapisywanie vendorowego wyzwalacza 'ffup' do misc...");
-            executeRootCommand("printf \"ffup\" | dd of=\"" + miscDev + "\" bs=4 count=1 conv=notrunc");
+            // 1. Source checksum
+            log(">>> [2/5] Computing source SHA-256 checksum...");
+            String srcHash = computeFileSha256(twrpImg, fileSize);
+            log("Source SHA-256: " + srcHash);
 
-            // Sync
-            log(">>> [4/5] Synchronizacja buforów...");
+            // 2. Backup recovery
+            log(">>> [3/5] Backing up current recovery partition...");
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            String backupPath = "/sdcard/RecoveryBackup/recovery_backup_" + timeStamp + ".img";
+            executeRootCommand("mkdir -p /sdcard/RecoveryBackup && dd if=" + recDev + " of=" + backupPath + " bs=4M");
+
+            // 3. Write recovery partition
+            log(">>> [4/5] Writing TWRP image to " + recDev + "...");
+            executeRootCommand("dd if=\"" + twrpImg + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
             executeRootCommand("sync");
 
-            log(">>> [5/5] Restartowanie stacji w trybie standardowym (LK wykryje ffup)...");
-            try { Thread.sleep(1500); } catch (Exception ignored) {}
-            // Plain reboot, NOT reboot recovery!
+            // 4. Verify post-flash integrity
+            log(">>> [5/5] Performing post-flash SHA-256 verification on eMMC...");
+            String partHash = computePartitionSha256(recDev, fileSize);
+            log("eMMC Partition SHA-256: " + partHash);
+
+            if (srcHash != null && srcHash.equalsIgnoreCase(partHash)) {
+                log("==================================================");
+                log("[VERIFICATION SUCCESS] SHA-256 matches perfectly!");
+                log("TWRP successfully written to recovery partition.");
+                log("Click 'Reboot Recovery (ffup)' to boot into TWRP.");
+                log("==================================================");
+            } else {
+                log("==================================================");
+                log("[CRITICAL ERROR] SHA-256 mismatch detected!");
+                log("Restoring backup immediately...");
+                executeRootCommand("dd if=\"" + backupPath + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+                executeRootCommand("sync");
+                log("Safety backup restored. Recovery partition is safe.");
+                log("==================================================");
+            }
+        }).start();
+    }
+
+    /**
+     * Reboots to recovery via Topway LittleKernel 'ffup' trigger.
+     */
+    private void runRebootRecovery() {
+        new Thread(() -> {
+            log(">>> Setting LittleKernel 'ffup' recovery trigger in misc...");
+            String miscDev = findBlockDevice("misc");
+            executeRootCommand("printf \"ffup\" | dd of=\"" + miscDev + "\" bs=4 count=1 conv=notrunc");
+            executeRootCommand("sync");
+
+            log(">>> Rebooting headunit cleanly (LittleKernel will detect ffup)...");
+            try { Thread.sleep(1000); } catch (Exception ignored) {}
             executeRootCommand("reboot");
         }).start();
     }
 
     /**
-     * Option 3: Fix boot loop & clear misc (PO BOŻEMU)
-     * Clears misc partition to remove stuck 'ffup' triggers,
-     * Restores valid Magisk or Stock boot image to boot partition,
-     * and performs full sync.
-     */
-    private void runFixBootLoop() {
-        new Thread(() -> {
-            log(">>> [1/4] Procedura ratunkowa 'PO BOŻEMU'...");
-            String bootDev = findBlockDevice("boot");
-            String miscDev = findBlockDevice("misc");
-
-            // 1. Clear misc partition completely so LittleKernel NEVER loops to recovery or fastboot
-            log(">>> [2/4] Czyszczenie flagi misc (usunięcie pętli Fastboot/Recovery)...");
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
-
-            // 2. Locate legitimate boot image
-            log(">>> [3/4] Wgrywanie sprawnego jądra boot.img...");
-            String goodBoot = findFile("boot_magisk_patched.img", "boot_stock.img", "stock_boot.img");
-            if (goodBoot != null) {
-                log("Używam sprawdzonego obrazu boot: " + goodBoot);
-                executeRootCommand("dd if=\"" + goodBoot + "\" of=\"" + bootDev + "\" bs=4M");
-            } else {
-                log("OSTRZEŻENIE: Nie znaleziono obrazu na USB. Jeśli backup istnieje w /sdcard, przywracam...");
-                executeRootCommand("dd if=/sdcard/RecoveryBackup/stock_boot_auto_backup.img of=\"" + bootDev + "\" bs=4M 2>/dev/null || true");
-            }
-
-            executeRootCommand("sync");
-            log(">>> [4/4] Flaga misc wyczyszczona, partycja boot przywrócona.");
-            log("==================================================");
-            log("SUKCES! Stacja jest odblokowana.");
-            log("Kliknij 'Restartuj Radio', aby uruchomić normalnie system.");
-            log("==================================================");
-        }).start();
-    }
-
-    /**
-     * Option 4: Full backup of boot and recovery
+     * Performs a full backup of boot and recovery partitions to /sdcard/RecoveryBackup/.
      */
     private void runBackupAll() {
         new Thread(() -> {
-            log("Rozpoczynanie zrzutu kopii zapasowej partycji boot i recovery...");
+            log(">>> Initiating full partition backup (boot and recovery)...");
             String bootDev = findBlockDevice("boot");
             String recDev = findBlockDevice("recovery");
 
@@ -350,21 +443,27 @@ public class MainActivity extends Activity {
             String outDir = "/sdcard/RecoveryBackup";
             executeRootCommand("mkdir -p " + outDir);
 
-            executeRootCommand("dd if=" + bootDev + " of=" + outDir + "/boot_backup_" + timeStamp + ".img bs=4M");
-            executeRootCommand("dd if=" + recDev + " of=" + outDir + "/recovery_backup_" + timeStamp + ".img bs=4M");
-            executeRootCommand("chmod -R 666 " + outDir);
+            String bootOut = outDir + "/boot_" + timeStamp + ".img";
+            String recOut = outDir + "/recovery_" + timeStamp + ".img";
 
-            log("SUKCES! Kopie zapasowe zapisane w " + outDir);
+            log("Saving boot backup to: " + bootOut);
+            executeRootCommand("dd if=" + bootDev + " of=" + bootOut + " bs=4M");
+
+            log("Saving recovery backup to: " + recOut);
+            executeRootCommand("dd if=" + recDev + " of=" + recOut + " bs=4M");
+
+            executeRootCommand("sync");
+            log("[SUCCESS] Partitions backed up successfully to " + outDir);
         }).start();
     }
 
     /**
-     * Option 5: Restores stock boot and stock recovery
+     * Restores stock boot and recovery images and clears misc trigger.
      */
     private void runRestoreStock() {
         new Thread(() -> {
-            log("Przywracanie oryginalnych partycji fabrycznych (Stock)...");
-            String stockBoot = findFile("boot_stock.img", "stock_boot.img", "stock_boot_before_twrp.img");
+            log(">>> Initiating stock firmware restoration...");
+            String stockBoot = findFile("boot_stock.img", "stock_boot.img");
             String stockRec = findFile("recovery.img", "stock_recovery.img");
 
             String bootDev = findBlockDevice("boot");
@@ -372,26 +471,42 @@ public class MainActivity extends Activity {
             String miscDev = findBlockDevice("misc");
 
             if (stockBoot != null) {
-                log("Przywracanie fabrycznego boot.img z: " + stockBoot);
-                executeRootCommand("dd if=\"" + stockBoot + "\" of=\"" + bootDev + "\" bs=4M");
-            }
-            if (stockRec != null) {
-                log("Przywracanie fabrycznego recovery.img z: " + stockRec);
-                executeRootCommand("dd if=\"" + stockRec + "\" of=\"" + recDev + "\" bs=4M");
+                log("Restoring stock boot.img from: " + stockBoot);
+                executeRootCommand("dd if=\"" + stockBoot + "\" of=\"" + bootDev + "\" bs=4M conv=fsync");
+            } else {
+                log("[WARNING] Stock boot image not found on external storage.");
             }
 
-            // Clear misc trigger
-            log("Czyszczenie nagłówka misc...");
-            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=4 count=1 conv=notrunc");
+            if (stockRec != null) {
+                log("Restoring stock recovery.img from: " + stockRec);
+                executeRootCommand("dd if=\"" + stockRec + "\" of=\"" + recDev + "\" bs=4M conv=fsync");
+            } else {
+                log("[WARNING] Stock recovery image not found on external storage.");
+            }
+
+            log("Clearing misc trigger...");
+            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
             executeRootCommand("sync");
 
-            log("SUKCES! Przywrócono fabryczny stan stacji.");
+            log("==================================================");
+            log("[SUCCESS] Factory stock state restored.");
+            log("Click 'Reboot System' to restart.");
+            log("==================================================");
         }).start();
     }
 
-    private void runReboot() {
+    /**
+     * Clears misc partition to eliminate boot loops and reboots system cleanly.
+     */
+    private void runRebootSystem() {
         new Thread(() -> {
-            log("Restartowanie stacji...");
+            log("Clearing misc trigger to ensure clean boot...");
+            String miscDev = findBlockDevice("misc");
+            executeRootCommand("dd if=/dev/zero of=\"" + miscDev + "\" bs=512 count=1 conv=notrunc");
+            executeRootCommand("sync");
+
+            log("Rebooting system...");
+            try { Thread.sleep(500); } catch (Exception ignored) {}
             executeRootCommand("reboot");
         }).start();
     }
