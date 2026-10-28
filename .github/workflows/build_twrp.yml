@@ -127,153 +127,10 @@ jobs:
             AVB_KEY="./avb_key.pem"
           fi
 
-          # Strict Android Boot Image Header v2 parsing, offset validation and section payload check
-          python3 -c '
-          import struct, sys, os
-
-          target_path = "./twrp_raw.img"
-          with open(target_path, "r+b") as f:
-              hdr = f.read(2048)
-              magic, k_sz, k_addr, r_sz, r_addr, s_sz, s_addr, tags_addr, page_sz, ver = struct.unpack("<8s9I", hdr[:44])
-              if magic != b"ANDROID!":
-                  raise ValueError(f"Invalid magic header: {magic}")
-              if ver != 2:
-                  raise ValueError(f"Expected Android Boot Image v2, got version {ver}")
-              if page_sz not in (2048, 4096):
-                  raise ValueError(f"Unexpected page size: {page_sz}")
-              dtbo_sz, dtbo_off = struct.unpack("<IQ", hdr[1632:1644])
-              hdr_sz, dtb_sz, dtb_addr = struct.unpack("<IIQ", hdr[1644:1660])
-
-              if hdr_sz < 1660:
-                  raise ValueError(f"Invalid header_size for v2: {hdr_sz} (expected >= 1660)")
-
-              if k_sz == 0:
-                  raise ValueError("Kernel payload size is 0")
-              if r_sz == 0:
-                  raise ValueError("Ramdisk payload size is 0")
-              if dtbo_sz == 0:
-                  raise ValueError("Recovery DTBO size is 0 (hardware requires DTBO for TS8667 display/touch panel)")
-              if dtb_sz == 0:
-                  raise ValueError("DTB size is 0 (hardware requires DTB for MT8667 platform boot)")
-
-              def pad(sz): return ((sz + page_sz - 1) // page_sz) * page_sz
-
-              off_k = page_sz
-              off_r = off_k + pad(k_sz)
-              off_s = off_r + pad(r_sz)
-              
-              # Validate declared recovery_dtbo_offset against sequential section position
-              if dtbo_sz > 0:
-                  expected_dtbo_off = off_s + pad(s_sz)
-                  if dtbo_off != expected_dtbo_off:
-                      raise ValueError(f"Declared DTBO offset mismatch: declared {dtbo_off} != expected {expected_dtbo_off}")
-                  
-                  # Verify Recovery DTBO table structure and all entries
-                  f.seek(dtbo_off)
-                  dtbo_table_hdr = f.read(32)
-                  if len(dtbo_table_hdr) != 32:
-                      raise ValueError("Truncated Recovery DTBO table header")
-                  dtbo_magic, dtbo_total_sz, dtbo_hdr_sz, dtbo_entry_sz, dtbo_count, dtbo_entries_off, dtbo_page_sz, dtbo_ver = struct.unpack(">8I", dtbo_table_hdr)
-                  if dtbo_magic != 0xd7b7ab1e:
-                      raise ValueError(f"Invalid DTBO table magic at {dtbo_off}: 0x{dtbo_magic:08x} (expected 0xd7b7ab1e)")
-                  if dtbo_total_sz != dtbo_sz or dtbo_total_sz < 32:
-                      raise ValueError(f"DTBO total_size mismatch: table {dtbo_total_sz} != boot header {dtbo_sz}")
-                  if dtbo_hdr_sz != 32 or dtbo_entry_sz < 32 or dtbo_entries_off < 32 or dtbo_count < 1:
-                      raise ValueError(f"Invalid DTBO table dimensions: hdr_sz={dtbo_hdr_sz}, entry_sz={dtbo_entry_sz}, count={dtbo_count}")
-                  
-                  dtbo_entries_end = dtbo_entries_off + (dtbo_count * dtbo_entry_sz)
-                  if dtbo_entries_end > dtbo_total_sz:
-                      raise ValueError("DTBO entries table exceeds DTBO total_size")
-
-                  for i in range(dtbo_count):
-                      f.seek(dtbo_off + dtbo_entries_off + (i * dtbo_entry_sz))
-                      entry_bytes = f.read(dtbo_entry_sz)
-                      e_sz, e_off = struct.unpack(">II", entry_bytes[:8])
-                      if e_off < dtbo_entries_end or (e_off + e_sz) > dtbo_total_sz:
-                          raise ValueError(f"DTBO entry {i} bounds violation: [{e_off}, {e_off + e_sz}] exceeds total {dtbo_total_sz}")
-                      f.seek(dtbo_off + e_off)
-                      fdt_hdr = f.read(8)
-                      fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
-                      if fdt_magic != 0xd00dfeed:
-                          raise ValueError(f"Invalid FDT magic in DTBO entry {i}: 0x{fdt_magic:08x}")
-                      if fdt_totalsize != e_sz:
-                          raise ValueError(f"DTBO entry {i} FDT totalsize {fdt_totalsize} != entry dt_size {e_sz}")
-
-                  print(f"Validated Recovery DTBO table at {dtbo_off}: size={dtbo_total_sz}, entries={dtbo_count}")
-                  off_dtb = dtbo_off + pad(dtbo_sz)
-              else:
-                  off_dtb = off_s + pad(s_sz)
-
-              # Validate DTB structure, all entries, and FDT payload with strict bounds checks
-              if dtb_sz > 0:
-                  f.seek(off_dtb)
-                  dtb_table_hdr = f.read(32)
-                  if len(dtb_table_hdr) != 32:
-                      raise ValueError(f"Truncated DTB table header: read {len(dtb_table_hdr)} bytes < 32")
-                  dtb_magic, dtb_total_sz, dtb_hdr_sz, entry_sz, entry_count, entries_off, dtb_page_sz, dtb_ver = struct.unpack(">8I", dtb_table_hdr)
-                  if dtb_magic != 0xd7b7ab1e:
-                      raise ValueError(f"Invalid DTB magic at {off_dtb}: 0x{dtb_magic:08x} (expected 0xd7b7ab1e)")
-                  if dtb_total_sz != dtb_sz or dtb_total_sz < 32:
-                      raise ValueError(f"Invalid DTB table size: {dtb_total_sz} != {dtb_sz} or < 32")
-                  if dtb_hdr_sz != 32:
-                      raise ValueError(f"Invalid DTB header size: {dtb_hdr_sz} != 32")
-                  if entry_sz < 32:
-                      raise ValueError(f"Invalid standard DTB entry size: {entry_sz} < 32")
-                  if entries_off < dtb_hdr_sz:
-                      raise ValueError(f"Invalid DTB entries offset: {entries_off} < {dtb_hdr_sz}")
-                  if entry_count < 1:
-                      raise ValueError("DTB table contains 0 entries")
-
-                  entries_end = entries_off + (entry_count * entry_sz)
-                  if entries_end > dtb_total_sz:
-                      raise ValueError(f"DTB entries boundary {entries_end} exceeds table size {dtb_total_sz}")
-
-                  # Verify all entries in DTB table
-                  for i in range(entry_count):
-                      f.seek(off_dtb + entries_off + (i * entry_sz))
-                      entry_data = f.read(entry_sz)
-                      if len(entry_data) < 32:
-                          raise ValueError(f"Truncated entry {i} read in DTB table")
-                      e_sz, e_off = struct.unpack(">II", entry_data[:8])
-
-                      if e_off < entries_end:
-                          raise ValueError(f"Entry {i} offset {e_off} overlaps entries table (end={entries_end})")
-                      if (e_off + e_sz) > dtb_total_sz:
-                          raise ValueError(f"Entry {i} FDT payload {e_off + e_sz} exceeds DTB table size {dtb_total_sz}")
-
-                      f.seek(off_dtb + e_off)
-                      fdt_hdr = f.read(8)
-                      if len(fdt_hdr) != 8:
-                          raise ValueError(f"Truncated FDT header read for entry {i}")
-                      fdt_magic, fdt_totalsize = struct.unpack(">II", fdt_hdr)
-                      if fdt_magic != 0xd00dfeed:
-                          raise ValueError(f"Invalid FDT magic at DTB entry {i} offset +{e_off}: 0x{fdt_magic:08x} (expected 0xd00dfeed)")
-                      if fdt_totalsize != e_sz:
-                          raise ValueError(f"FDT totalsize {fdt_totalsize} != entry {i} dt_size {e_sz}")
-
-                  print(f"Validated DTB table at {off_dtb}: size={dtb_total_sz}, entries={entry_count}")
-                  total_payload = off_dtb + pad(dtb_sz)
-              else:
-                  total_payload = off_dtb
-
-              current_sz = f.seek(0, 2)
-              print(f"Boot v2 Header rigorously validated: ver={ver}, hdr_sz={hdr_sz}, page_sz={page_sz}")
-              print(f"  Kernel: offset={off_k}, size={k_sz} (padded={pad(k_sz)})")
-              print(f"  Ramdisk: offset={off_r}, size={r_sz} (padded={pad(r_sz)})")
-              print(f"  DTBO: offset={dtbo_off}, size={dtbo_sz}")
-              print(f"  DTB: offset={off_dtb}, size={dtb_sz}")
-              print(f"Calculated payload boundary: {total_payload} bytes (current file size: {current_sz} bytes)")
-
-              if total_payload > 33484800:
-                  raise ValueError(f"Payload {total_payload} exceeds max allowed size 33484800 for 32MB partition")
-
-              if current_sz < total_payload:
-                  raise ValueError(f"Truncated input image: current file size {current_sz} bytes < required payload {total_payload} bytes")
-
-              if current_sz > total_payload:
-                  print(f"Truncating {target_path} from {current_sz} to exact payload {total_payload} bytes")
-                  f.truncate(total_payload)
-          '
+          # Strict Android Boot Image Header v2 parsing, offset validation, DT table check and payload truncation
+          # Uses the single canonical tools/validate_boot_v2.py shared between local testing and CI
+          python3 tools/validate_boot_v2.py ./twrp_raw.img --truncate --max-partition-size 33554432 > boot_v2_validation_report.txt
+          cat boot_v2_validation_report.txt
 
           # Inject AVB hash footer
           "${avbtool_cmd[@]}" add_hash_footer \
@@ -330,6 +187,7 @@ jobs:
           name: twrp_junsun_${{ github.run_number }}_package
           path: |
             ./${{ env.TARGET_FILE }}
+            boot_v2_validation_report.txt
             avb_verification_report.txt
             avb_crypto_verification.txt
             sha256_recovery.txt
